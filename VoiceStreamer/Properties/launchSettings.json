@@ -1,0 +1,14 @@
+{
+  "profiles": {
+    "VoiceStreamer": {
+      "commandName": "Project"
+    },
+    "WSL": {
+      "commandName": "WSL2",
+      "distributionName": ""
+    },
+    "Bash": {
+      "commandName": "Project"
+    }
+  }
+}

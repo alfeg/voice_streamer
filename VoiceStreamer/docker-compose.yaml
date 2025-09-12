@@ -1,0 +1,16 @@
+services:
+  voicestreamer:
+    build:
+      context: ..
+      dockerfile: VoiceStreamer/Dockerfile
+    env_file:
+    - .env
+    - path: .env.prod
+      required: false    
+    volumes:
+      - voice:/app/data
+    
+    container_name: voicestreamer
+
+volumes:
+  voice:
