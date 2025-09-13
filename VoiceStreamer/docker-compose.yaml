@@ -9,6 +9,7 @@ services:
       required: false    
     volumes:
       - voice:/app/data
+    restart: unless-stopped
     
     container_name: voicestreamer
 
