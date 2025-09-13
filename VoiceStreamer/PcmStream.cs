@@ -3,17 +3,16 @@ using FFMpegCore.Pipes;
 using System.Diagnostics;
 using System.Threading.Channels;
 
-internal class PcmStream : Stream
+internal class PcmStream(ChannelReader<string> oggFileChannel, StreamConfig config, CancellationToken token)
+    : Stream
 {
-    private readonly ChannelReader<string> _oggFileChannel;
-    private readonly CancellationToken _cancellationToken;
-    private readonly byte[] _silenceChunk;
-    private readonly byte[] _buffer;
-    private int _bufferPosition;
-    private int _bufferLength;
+    private readonly byte[] _silenceChunk = new byte[ChunkBytes];
+    private readonly byte[] _buffer = new byte[ChunkBytes]; // Single chunk buffer
+    private int _bufferPosition = 0;
+    private int _bufferLength = 0;
     private bool _isDisposed;
-    private byte[] _pendingMessagePcm;
-    private int _messagePosition;
+    private byte[] _pendingMessagePcm = null;
+    private int _messagePosition = 0;
     private long _totalBytesSent = 0; // Tracks the total number of bytes sent to the stream
 
     // Audio format constants
@@ -22,43 +21,15 @@ internal class PcmStream : Stream
     public const int BytesPerSample = 2; // s16le
     public const double ChunkDurationSec = 0.4; // 100ms chunks for smooth pacing
     public const int ChunkBytes = (int)(SampleRate * ChunkDurationSec * Channels * BytesPerSample);
-    // public static readonly byte[] SilenceChunk = new byte[ChunkBytes]; // All zeros for silence
-    public static readonly byte[] SilenceChunk;
-
-    public PcmStream(ChannelReader<string> oggFileChannel, CancellationToken cancellationToken)
-    {
-        _oggFileChannel = oggFileChannel;
-        _cancellationToken = cancellationToken;
-        _silenceChunk = SilenceChunk;
-        _buffer = new byte[ChunkBytes]; // Single chunk buffer
-        _bufferPosition = 0;
-        _bufferLength = 0;
-        _pendingMessagePcm = null;
-        _messagePosition = 0;
-    }
-
-    static PcmStream()
-    {
-        // Initialize SilenceChunk with low-amplitude white noise for debugging
-        SilenceChunk = new byte[ChunkBytes];
-        var random = new Random();
-        for (int i = 0; i < SilenceChunk.Length; i += 2)
-        {
-            // Generate random s16le samples (-32768 to 32767) at low amplitude (±1000 for subtle noise)
-            short sample = (short)(random.Next(-1000, 1001));
-            SilenceChunk[i] = (byte)(sample & 0xFF); // Low byte
-            SilenceChunk[i + 1] = (byte)((sample >> 8) & 0xFF); // High byte
-        }
-    }
-
+    
     static readonly Random rnd = new Random();
 
-    private static void FillWithNoise(byte[] buffer)
+    private void FillWithNoise(byte[] buffer)
     {
         for (int i = 0; i < buffer.Length; i += 2)
         {
             // Generate random s16le samples (-32768 to 32767) at low amplitude (±1000 for subtle noise)
-            short sample = (short)(rnd.Next(0, 100));
+            var sample = config.DisableNoise ? (short)0 : (short)(rnd.Next(0, 100));
             buffer[i] = (byte)(sample & 0xFF); // Low byte
             buffer[i + 1] = (byte)((sample >> 8) & 0xFF); // High byte
         }
@@ -77,7 +48,7 @@ internal class PcmStream : Stream
         if (_isDisposed) throw new ObjectDisposedException(nameof(PcmStream));
 
         int totalBytesRead = 0;
-        while (totalBytesRead < count && !_cancellationToken.IsCancellationRequested)
+        while (totalBytesRead < count && !token.IsCancellationRequested)
         {
             // If the local buffer has data, copy from it first
             if (_bufferPosition < _bufferLength)
@@ -118,7 +89,7 @@ internal class PcmStream : Stream
             // If no pending message or finished, check channel
             if (_pendingMessagePcm == null || _messagePosition >= _pendingMessagePcm.Length)
             {
-                if (_oggFileChannel.TryRead(out var oggPath) && File.Exists(oggPath))
+                if (oggFileChannel.TryRead(out var oggPath) && File.Exists(oggPath))
                 {
                     try
                     {

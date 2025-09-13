@@ -2,23 +2,17 @@
 using FFMpegCore.Pipes;
 using System.Threading.Channels;
 
-public class VoiceStreamerClient
+public class VoiceStreamerClient(StreamConfig config, ChannelReader<string> oggFileChannel)
 {
-    private readonly StreamConfig _config;
-    private readonly ChannelReader<string> _oggFileChannel;
+    private readonly StreamConfig _config = config ?? throw new ArgumentNullException(nameof(config));
+    private readonly ChannelReader<string> _oggFileChannel = oggFileChannel ?? throw new ArgumentNullException(nameof(oggFileChannel));
     private readonly CancellationTokenSource _cts = new();
-    
-    public VoiceStreamerClient(StreamConfig config, ChannelReader<string> oggFileChannel)
-    {
-        _config = config ?? throw new ArgumentNullException(nameof(config));
-        _oggFileChannel = oggFileChannel ?? throw new ArgumentNullException(nameof(oggFileChannel));
-    }
 
     public Task StartStreamingAsync(CancellationToken cancellationToken = default)
     {
         // Combine caller-provided token with internal CTS for shutdown
         var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
-        return Task.Run(() => StartContinuousStream(linkedCts.Token), linkedCts.Token);
+        return Task.Run(() => StartContinuousStream(), linkedCts.Token);
     }
 
     public void StopStreaming()
@@ -26,9 +20,10 @@ public class VoiceStreamerClient
         _cts.Cancel();
     }
 
-    private async Task StartContinuousStream(CancellationToken cancellationToken)
+    private async Task StartContinuousStream()
     {
-        var audioSource = new StreamPipeSource(CreatePcmStream());
+        var stream = new PcmStream(_oggFileChannel, config, _cts.Token);
+        var audioSource = new StreamPipeSource(stream);
 
         try
         {
@@ -60,11 +55,6 @@ public class VoiceStreamerClient
             Console.WriteLine($"Streaming error: {ex.Message}");
         }
 
-        System.Environment.Exit(1);
-    }
-
-    private Stream CreatePcmStream()
-    {
-        return new PcmStream(_oggFileChannel, _cts.Token);
+        Environment.Exit(1);
     }
 }
