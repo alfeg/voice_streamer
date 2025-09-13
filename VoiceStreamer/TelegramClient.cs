@@ -120,7 +120,7 @@ public class TelegramClient : IDisposable
 
                 else if (m.media is MessageMediaDocument { document: Document voiceMessage })
                 {
-                    if (!_downloadedFiles.Contains(voiceMessage.ID))
+                    if (!_downloadedFiles.Contains(voiceMessage.ID) || edit)
                     {
                         _downloadedFiles.Add(voiceMessage.ID);
                         if (_downloadedFiles.Count > 10)
