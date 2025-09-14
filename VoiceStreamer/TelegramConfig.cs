@@ -8,4 +8,8 @@ public record TelegramConfig
     public string ChannelToWatch { get; set; }
     public string UserId { get; set; }
     public string PhoneNumber { get; set; }
+    
+    public string BotToken { get; set; }
+    
+    public string BotChatId { get; set; }
 }

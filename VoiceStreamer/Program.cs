@@ -2,6 +2,7 @@
 using System.Threading.Channels;
 using Microsoft.Extensions.Configuration;
 using Serilog;
+using Serilog.Sinks.TelegramBot;
 using Spectre.Console;
 using VoiceStreamer;
 
@@ -15,12 +16,20 @@ var config = new ConfigurationBuilder()
     .AddUserSecrets(typeof(Program).Assembly)
     .Build();
 
-await using var log = new LoggerConfiguration()
-    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Module}{Message:lj}{NewLine}{Exception}")
-    .CreateLogger();
-
 var streamConfig = config.GetSection("Streamer").Get<StreamConfig>();
 var telegramConfig = config.GetSection("Telegram").Get<TelegramConfig>();
+
+var loggerConfiguration = new LoggerConfiguration()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Module}{Message:lj}{NewLine}{Exception}");
+
+if (!string.IsNullOrWhiteSpace(telegramConfig.BotToken) && !string.IsNullOrWhiteSpace(telegramConfig.BotChatId))
+{
+    loggerConfiguration
+        .WriteTo.TelegramBot(telegramConfig.BotToken, telegramConfig.BotChatId);
+}
+
+await using var log = loggerConfiguration.CreateLogger();
+
 var voiceChannel = Channel.CreateUnbounded<VoiceMessageInfo>(new UnboundedChannelOptions
     { SingleReader = true, SingleWriter = false });
 

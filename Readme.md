@@ -113,4 +113,14 @@ cd VoiceStreamer
    docker-compose up --build
    ```
 
+### 5. Логирование в бота (опционально)
 
+Возможно добавить настройку, чтобы логи отправлялись в телеграм бота.
+
+В `.env.prod` добавьте
+```
+Telegram__BotToken=
+Telegram__BotChatId=
+```
+Токен можно получить у [BotFather](https://telegram.me/botfather), а BotChatId у [RawDataBot](https://telegram.me/RawDataBot). 
+Добавьте бота себе в контакты и он сможет пересылать вам логи.
