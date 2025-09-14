@@ -43,7 +43,7 @@ public class VoiceStreamerClient(StreamConfig config, ChannelReader<VoiceMessage
                     )
                     .WithLogLevel(FFMpegCore.Enums.FFMpegLogLevel.Info)
                     .NotifyOnOutput(Console.WriteLine)
-                // .NotifyOnError(Console.WriteLine)
+                  //.NotifyOnError(log.ForContext("Module", "[VF] ffpmpeg: ").Information)
                 ;
 
             var taSource = new TaskCompletionSource();

@@ -1,4 +1,5 @@
-﻿using System.Threading.Channels;
+﻿using System.Diagnostics.Metrics;
+using System.Threading.Channels;
 using Microsoft.Extensions.Configuration;
 using Serilog;
 using Spectre.Console;
@@ -35,12 +36,14 @@ try
     using var telegramClient =
         new TelegramClient(telegramConfig, voiceChannel.Writer, log.ForContext("Module", "[TG] "));
     var publisher = new VoiceStreamerClient(streamConfig, voiceChannel.Reader, log.ForContext("Module", "[VS] "));
+    var reporter = new AppMetricReporter(log.ForContext("Module", "[VS] "));
     
     log.Information("Ctrl+C для выхода.");
 
     await Task.WhenAll(
         telegramClient.StartAsync(),
-        publisher.StartStreamingAsync());
+        publisher.StartStreamingAsync(),
+        reporter.Start());
 }
 finally
 {

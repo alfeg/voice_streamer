@@ -3,11 +3,14 @@ using System.Threading.Channels;
 using FFMpegCore;
 using FFMpegCore.Pipes;
 using Serilog;
-using Spectre.Console;
 
 namespace VoiceStreamer;
 
-internal class PcmStream(ChannelReader<VoiceMessageInfo> oggFileChannel, StreamConfig config, ILogger log, CancellationToken token)
+internal class PcmStream(
+    ChannelReader<VoiceMessageInfo> oggFileChannel,
+    StreamConfig config,
+    ILogger log,
+    CancellationToken token)
     : Stream
 {
     private readonly byte[] _silenceChunk = new byte[ChunkBytes];
@@ -17,15 +20,17 @@ internal class PcmStream(ChannelReader<VoiceMessageInfo> oggFileChannel, StreamC
     private bool _isDisposed;
     private byte[] _pendingMessagePcm = null;
     private int _messagePosition = 0;
-    private long _totalBytesSent = 0; // Tracks the total number of bytes sent to the stream
+
+    private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
+    private VoiceMessageInfo? _messageInfo;
 
     // Audio format constants
     public const int SampleRate = 44100;
     public const int Channels = 2;
-    public const int BytesPerSample = 2; // s16le
-    public const double ChunkDurationSec = 0.4; // 100ms chunks for smooth pacing
-    public const int ChunkBytes = (int)(SampleRate * ChunkDurationSec * Channels * BytesPerSample);
-    
+    private const int BytesPerSample = 2; // s16le
+    private const double ChunkDurationSec = 0.4; // 100ms chunks for smooth pacing
+    private const int ChunkBytes = (int)(SampleRate * ChunkDurationSec * Channels * BytesPerSample);
+
     static readonly Random rnd = new Random();
 
     private void FillWithNoise(byte[] buffer)
@@ -33,7 +38,7 @@ internal class PcmStream(ChannelReader<VoiceMessageInfo> oggFileChannel, StreamC
         for (int i = 0; i < buffer.Length; i += 2)
         {
             // Generate random s16le samples (-32768 to 32767) at low amplitude (±1000 for subtle noise)
-            var sample = config.DisableNoise ? (short)0 : (short)(rnd.Next(0, 100));
+            var sample = config.DisableNoise ? (short)0 : (short)(rnd.Next(0, 1000));
             buffer[i] = (byte)(sample & 0xFF); // Low byte
             buffer[i + 1] = (byte)((sample >> 8) & 0xFF); // High byte
         }
@@ -43,10 +48,12 @@ internal class PcmStream(ChannelReader<VoiceMessageInfo> oggFileChannel, StreamC
     public override bool CanSeek => false;
     public override bool CanWrite => false;
     public override long Length => throw new NotSupportedException();
-    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
-    private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
-    private VoiceMessageInfo? _messageInfo;
+    public override long Position
+    {
+        get => throw new NotSupportedException();
+        set => throw new NotSupportedException();
+    }
 
     public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
     {
@@ -60,20 +67,21 @@ internal class PcmStream(ChannelReader<VoiceMessageInfo> oggFileChannel, StreamC
             {
                 int bytesToCopy = Math.Min(count - totalBytesRead, _bufferLength - _bufferPosition);
                 Array.Copy(_buffer, _bufferPosition, buffer, offset + totalBytesRead, bytesToCopy);
+                Interlocked.Add(ref AppMetrics.TotalBytesSend, bytesToCopy);
 
                 _bufferPosition += bytesToCopy;
                 totalBytesRead += bytesToCopy;
-                _totalBytesSent += bytesToCopy; // Update the total sent bytes
                 
                 // Pacing logic: Wait to align with real-time audio playback.
                 double bytesPerSecond = (double)SampleRate * Channels * BytesPerSample;
-                double expectedMilliseconds = (_totalBytesSent / bytesPerSecond) * 1000.0;
+                double expectedMilliseconds = (bytesToCopy / bytesPerSecond) * 1000.0;
                 double elapsedMilliseconds = _stopwatch.Elapsed.TotalMilliseconds;
                 double delayMilliseconds = expectedMilliseconds - elapsedMilliseconds;
 
+                _stopwatch.Restart();
                 if (delayMilliseconds > 0)
                 {
-                    // Console.WriteLine($"Pacing delay: {delayMilliseconds:F2}ms. offset: {offset}, count: {count}");
+                    //log.Information($"Pacing delay: {delayMilliseconds:F2}ms. offset: {offset}, count: {count}, bps: {bytesPerSecond}");
                     try
                     {
                         await Task.Delay((int)delayMilliseconds, cancellationToken);
@@ -100,13 +108,16 @@ internal class PcmStream(ChannelReader<VoiceMessageInfo> oggFileChannel, StreamC
                     {
                         _pendingMessagePcm = await DecodeOggToPcm(info.FilePath);
                         _messageInfo = info;
-                        log.Information("{From}> #{MessageId} (-{Delay}) Сообщение готово к отправке", info.Peer, info.Id, info.Delay());
+                        log.Information("{From}> #{MessageId} (-{Delay}) Сообщение готово к отправке", info.Peer,
+                            info.Id, info.Delay());
                         _messagePosition = 0;
                         File.Delete(info.FilePath);
                     }
                     catch (Exception ex)
                     {
-                        log.Error(ex, "{From}> #{MessageId} (-{Delay}) Непредвиденная ошибка при декодировании сообщения", info.Peer, info.Id, info.Delay());
+                        log.Error(ex,
+                            "{From}> #{MessageId} (-{Delay}) Непредвиденная ошибка при декодировании сообщения",
+                            info.Peer, info.Id, info.Delay());
                         _pendingMessagePcm = null;
                     }
                 }
@@ -125,7 +136,10 @@ internal class PcmStream(ChannelReader<VoiceMessageInfo> oggFileChannel, StreamC
                 {
                     _pendingMessagePcm = null;
                     _messagePosition = 0;
-                    log.Information("{From}> #{MessageId} (-{Delay}) Сообщение передано в стрим", _messageInfo?.Peer, _messageInfo?.Id, _messageInfo?.Delay());
+                    log.Information("{From}> #{MessageId} (-{Delay}) Сообщение передано в стрим", _messageInfo?.Peer,
+                        _messageInfo?.Id, _messageInfo?.Delay());
+                    
+                    Interlocked.Increment(ref AppMetrics.TotalMessagesSend);
                     _messageInfo = null;
                 }
             }
@@ -135,14 +149,16 @@ internal class PcmStream(ChannelReader<VoiceMessageInfo> oggFileChannel, StreamC
                 FillWithNoise(_silenceChunk);
                 Array.Copy(_silenceChunk, 0, _buffer, 0, ChunkBytes);
                 _bufferLength = ChunkBytes;
-                _bufferPosition = 0;                
+                _bufferPosition = 0;
             }
         }
 
         return totalBytesRead;
     }
 
-    public override void Flush() { }
+    public override void Flush()
+    {
+    }
 
     public override int Read(byte[] buffer, int offset, int count)
     {
@@ -170,6 +186,7 @@ internal class PcmStream(ChannelReader<VoiceMessageInfo> oggFileChannel, StreamC
         {
             _isDisposed = true;
         }
+
         base.Dispose(disposing);
     }
 
