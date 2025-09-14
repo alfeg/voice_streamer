@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using FFMpegCore;
 using FFMpegCore.Pipes;
 using Serilog;
+using Spectre.Console;
 
 namespace VoiceStreamer;
 
@@ -63,7 +64,7 @@ internal class PcmStream(ChannelReader<VoiceMessageInfo> oggFileChannel, StreamC
                 _bufferPosition += bytesToCopy;
                 totalBytesRead += bytesToCopy;
                 _totalBytesSent += bytesToCopy; // Update the total sent bytes
-
+                
                 // Pacing logic: Wait to align with real-time audio playback.
                 double bytesPerSecond = (double)SampleRate * Channels * BytesPerSample;
                 double expectedMilliseconds = (_totalBytesSent / bytesPerSecond) * 1000.0;
@@ -99,13 +100,13 @@ internal class PcmStream(ChannelReader<VoiceMessageInfo> oggFileChannel, StreamC
                     {
                         _pendingMessagePcm = await DecodeOggToPcm(info.FilePath);
                         _messageInfo = info;
-                        log.Information("[#{ID}] Сообщение готово к отправке", info.Id);
+                        log.Information("{From}> #{MessageId} (-{Delay}) Сообщение готово к отправке", info.Peer, info.Id, info.Delay());
                         _messagePosition = 0;
                         File.Delete(info.FilePath);
                     }
                     catch (Exception ex)
                     {
-                        log.Error(ex, "[#{ID}] Непредвиденная ошибка при декодировании сообщения", info.Id);
+                        log.Error(ex, "{From}> #{MessageId} (-{Delay}) Непредвиденная ошибка при декодировании сообщения", info.Peer, info.Id, info.Delay());
                         _pendingMessagePcm = null;
                     }
                 }
@@ -124,7 +125,7 @@ internal class PcmStream(ChannelReader<VoiceMessageInfo> oggFileChannel, StreamC
                 {
                     _pendingMessagePcm = null;
                     _messagePosition = 0;
-                    log.Information("[#{ID}] Сообщение передано в стрим", _messageInfo?.Id);
+                    log.Information("{From}> #{MessageId} (-{Delay}) Сообщение передано в стрим", _messageInfo?.Peer, _messageInfo?.Id, _messageInfo?.Delay());
                     _messageInfo = null;
                 }
             }

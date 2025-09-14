@@ -1,4 +1,5 @@
 ﻿using System.Threading.Channels;
+using Humanizer;
 using Serilog;
 using TL;
 using WTelegram;
@@ -14,7 +15,7 @@ public class TelegramClient(TelegramConfig config, ChannelWriter<VoiceMessageInf
     public async Task StartAsync()
     {
         Helpers.Log = (i, message) => log.Verbose(message);
-        
+
         log.Information("Запускаем соединение с Telegram. AppId: {AppId}, AppHash: {AppHash}",
             config.ApiId.ToString().Obfuscate(), config.ApiHash.Obfuscate());
 
@@ -44,8 +45,10 @@ public class TelegramClient(TelegramConfig config, ChannelWriter<VoiceMessageInf
         {
             return config.Code;
         }
-        
-        log.Warning("Был выслан {What}. Установите полученный код в значение переменной Telegram.Code и перезапустите приложение", what);
+
+        log.Warning(
+            "Был выслан {What}. Установите полученный код в значение переменной Telegram.Code и перезапустите приложение",
+            what);
         log.Information("Значение переменной может быть передано как:");
         log.Information(" - переменная окружения: {Sample}", "Telegram__Code=xxx");
         log.Information(" - аргумент коммандной строки: {Sample2} или {Sample3}", "--code xxx", "--Telegram:Code xxx");
@@ -61,7 +64,7 @@ public class TelegramClient(TelegramConfig config, ChannelWriter<VoiceMessageInf
             case UpdateNewMessage unm: await HandleMessage(unm.message); break;
             case UpdateEditMessage uem: await HandleMessage(uem.message, true); break;
             //case UpdateUserStatus uus:
-                //Console.WriteLine($"{User(uus.user_id)} is now {uus.status.GetType().Name[10..]}"); break;
+            //Console.WriteLine($"{User(uus.user_id)} is now {uus.status.GetType().Name[10..]}"); break;
         }
     }
 
@@ -89,7 +92,7 @@ public class TelegramClient(TelegramConfig config, ChannelWriter<VoiceMessageInf
                     if (_downloadedFiles.Contains(voiceMessage.ID) || edit) break;
                     _downloadedFiles.Add(voiceMessage.ID);
                     if (_downloadedFiles.Count > 20) _downloadedFiles.RemoveAt(9);
-                    await DownloadVoiceAsync(voiceMessage, voiceMessage.ID);
+                    await DownloadVoiceAsync(voiceMessage, voiceMessage.ID, Peer(m.peer_id), m.Date);
                 }
 
                 break;
@@ -107,7 +110,7 @@ public class TelegramClient(TelegramConfig config, ChannelWriter<VoiceMessageInf
         return chat?.MainUsername ?? string.Empty;
     }
 
-    private async Task DownloadVoiceAsync(Document document, long messageId)
+    private async Task DownloadVoiceAsync(Document document, long messageId, string peer, DateTime timestamp)
     {
         try
         {
@@ -118,9 +121,12 @@ public class TelegramClient(TelegramConfig config, ChannelWriter<VoiceMessageInf
 
             var fileName = $"voice_{messageId}.ogg";
             var filePath = Path.Combine("data", "downloads", fileName);
+            var voiceMessageInfo = new VoiceMessageInfo(filePath, messageId, peer, timestamp);
+
             await using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write);
 
-            log.Information("[#{MessageId}] Загружаем сообщение", messageId);
+            log.Information("{From}> #{MessageId} (-{Delay}) Загружаем сообщение", peer, messageId,
+                voiceMessageInfo.Delay());
 
             try
             {
@@ -131,12 +137,13 @@ public class TelegramClient(TelegramConfig config, ChannelWriter<VoiceMessageInf
                 await _client.DownloadFileAsync(document, fileStream);
             }
 
-            log.Information("[#{MessageId}] Сообщение загружено", messageId);
-            await voiceChannel.WriteAsync(new VoiceMessageInfo(filePath, messageId));
+            log.Information("{From}> #{MessageId} (-{Delay}) Сообщение загружено  ({Size})", peer, messageId,
+                voiceMessageInfo.Delay(), fileStream.Length.Bytes().Humanize());
+            await voiceChannel.WriteAsync(voiceMessageInfo);
         }
         catch (Exception ex)
         {
-            log.Error(ex, "Ошибка скачивания");
+            log.Error(ex, "{From}> #{MessageId} Ошибка скачивания", peer, messageId);
         }
     }
 
