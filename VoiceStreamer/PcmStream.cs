@@ -1,9 +1,12 @@
-﻿using FFMpegCore;
-using FFMpegCore.Pipes;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Threading.Channels;
+using FFMpegCore;
+using FFMpegCore.Pipes;
+using Serilog;
 
-internal class PcmStream(ChannelReader<string> oggFileChannel, StreamConfig config, CancellationToken token)
+namespace VoiceStreamer;
+
+internal class PcmStream(ChannelReader<VoiceMessageInfo> oggFileChannel, StreamConfig config, ILogger log, CancellationToken token)
     : Stream
 {
     private readonly byte[] _silenceChunk = new byte[ChunkBytes];
@@ -42,6 +45,7 @@ internal class PcmStream(ChannelReader<string> oggFileChannel, StreamConfig conf
     public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
     private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
+    private VoiceMessageInfo? _messageInfo;
 
     public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
     {
@@ -89,18 +93,19 @@ internal class PcmStream(ChannelReader<string> oggFileChannel, StreamConfig conf
             // If no pending message or finished, check channel
             if (_pendingMessagePcm == null || _messagePosition >= _pendingMessagePcm.Length)
             {
-                if (oggFileChannel.TryRead(out var oggPath) && File.Exists(oggPath))
+                if (oggFileChannel.TryRead(out var info) && File.Exists(info.FilePath))
                 {
                     try
                     {
-                        _pendingMessagePcm = await DecodeOggToPcm(oggPath);
-                        Console.WriteLine($"[{Path.GetFileName(oggPath)}] Передаем в стрим");
+                        _pendingMessagePcm = await DecodeOggToPcm(info.FilePath);
+                        _messageInfo = info;
+                        log.Information("[#{ID}] Сообщение готово к отправке", info.Id);
                         _messagePosition = 0;
-                        File.Delete(oggPath);
+                        File.Delete(info.FilePath);
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error processing {oggPath}: {ex.Message}");
+                        log.Error(ex, "[#{ID}] Непредвиденная ошибка при декодировании сообщения", info.Id);
                         _pendingMessagePcm = null;
                     }
                 }
@@ -119,7 +124,8 @@ internal class PcmStream(ChannelReader<string> oggFileChannel, StreamConfig conf
                 {
                     _pendingMessagePcm = null;
                     _messagePosition = 0;
-                    Console.WriteLine("Сообщение передано в стрим");
+                    log.Information("[#{ID}] Сообщение передано в стрим", _messageInfo?.Id);
+                    _messageInfo = null;
                 }
             }
             else

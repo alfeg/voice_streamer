@@ -1,0 +1,1 @@
+﻿public record VoiceMessageInfo(string FilePath, long Id);

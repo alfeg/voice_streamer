@@ -1,34 +1,46 @@
 ﻿using System.Threading.Channels;
+using Microsoft.Extensions.Configuration;
+using Serilog;
+using Spectre.Console;
 using VoiceStreamer;
 
 var config = new ConfigurationBuilder()
     .AddJsonFile("appsettings.json", optional: true)
-    .AddCommandLine(args)
+    .AddCommandLine(args, new Dictionary<string, string>
+    {
+        ["--code"] = "Telegram:Code"
+    })
     .AddEnvironmentVariables()
     .AddUserSecrets(typeof(Program).Assembly)
     .Build();
 
+await using var log = new LoggerConfiguration()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Module}{Message:lj}{NewLine}{Exception}")
+    .CreateLogger();
+
 var streamConfig = config.GetSection("Streamer").Get<StreamConfig>();
 var telegramConfig = config.GetSection("Telegram").Get<TelegramConfig>();
-var voiceChannel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+var voiceChannel = Channel.CreateUnbounded<VoiceMessageInfo>(new UnboundedChannelOptions
+    { SingleReader = true, SingleWriter = false });
 
 if (!Directory.Exists("data"))
 {
     Directory.CreateDirectory("data");
 }
 
-Console.WriteLine("VoiceStreamer starting...");
+AnsiConsole.Write(new FigletText("Voice Streamer").LeftJustified());
 
 try
 {
-    using var telegramClient = new TelegramClient(telegramConfig, voiceChannel.Writer);
-    var publisher = new VoiceStreamerClient(streamConfig, voiceChannel);
+    using var telegramClient =
+        new TelegramClient(telegramConfig, voiceChannel.Writer, log.ForContext("Module", "[TG] "));
+    var publisher = new VoiceStreamerClient(streamConfig, voiceChannel.Reader, log.ForContext("Module", "[VS] "));
+    
+    log.Information("Ctrl+C для выхода.");
 
-    await telegramClient.StartAsync();
-    await publisher.StartStreamingAsync();
-
-    Console.WriteLine($"Мониторим {telegramConfig.ChannelToWatch}. Ctrl+C для выхода.");
-    Console.ReadLine();
+    await Task.WhenAll(
+        telegramClient.StartAsync(),
+        publisher.StartStreamingAsync());
 }
 finally
 {

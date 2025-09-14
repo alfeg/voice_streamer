@@ -1,4 +1,6 @@
-﻿public record TelegramConfig
+﻿namespace VoiceStreamer;
+
+public record TelegramConfig
 {
     public int ApiId { get; set; }
     public string ApiHash { get; set; }
