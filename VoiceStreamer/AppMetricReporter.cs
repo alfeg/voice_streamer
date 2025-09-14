@@ -13,6 +13,9 @@ public class AppMetricReporter(ILogger log)
         var sw = Stopwatch.StartNew();
         long prevBytesSend = AppMetrics.TotalBytesSend;
         long prevMessages = AppMetrics.TotalMessagesSend;
+
+        int delay = 10;
+        int NextDelay() => (int)Math.Min(delay * Math.E, 60 * 60);
         
         while (true)
         {
@@ -22,10 +25,19 @@ public class AppMetricReporter(ILogger log)
                 continue;
             }
 
-            if (AppMetrics.TotalMessagesSend - prevMessages == 0 && sw.Elapsed.TotalSeconds < 60)
+            if (AppMetrics.TotalMessagesSend - prevMessages == 0 )
             {
-                await Task.Delay(TimeSpan.FromSeconds(1));
-                continue;
+                if (sw.Elapsed.TotalSeconds < delay)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    continue;
+                }
+
+                delay = NextDelay();
+            }
+            else
+            {
+                delay = 60;
             }
 
             log.Information("Messages: {TotalMessages}, Bytes Sent: {TotalBytes} ({Rate})", 
