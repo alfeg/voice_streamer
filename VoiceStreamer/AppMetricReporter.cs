@@ -18,11 +18,13 @@ public class AppMetricReporter(ILogger log)
         {
             if (sw.Elapsed.TotalSeconds < 3)
             {
+                await Task.Delay(TimeSpan.FromSeconds(1));
                 continue;
             }
 
-            if (AppMetrics.TotalMessagesSend - prevMessages == 0 && sw.Elapsed.TotalSeconds < 30)
+            if (AppMetrics.TotalMessagesSend - prevMessages == 0 && sw.Elapsed.TotalSeconds < 60)
             {
+                await Task.Delay(TimeSpan.FromSeconds(1));
                 continue;
             }
 

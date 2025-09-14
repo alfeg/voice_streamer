@@ -33,8 +33,15 @@ internal class PcmStream(
 
     static readonly Random rnd = new Random();
 
+    private bool _noiseFilled = false;
+    
     private void FillWithNoise(byte[] buffer)
     {
+        if (config.DisableNoise && _noiseFilled)
+        {
+            return;
+        }
+        
         for (int i = 0; i < buffer.Length; i += 2)
         {
             // Generate random s16le samples (-32768 to 32767) at low amplitude (±1000 for subtle noise)
@@ -42,6 +49,8 @@ internal class PcmStream(
             buffer[i] = (byte)(sample & 0xFF); // Low byte
             buffer[i + 1] = (byte)((sample >> 8) & 0xFF); // High byte
         }
+
+        _noiseFilled = true;
     }
 
     public override bool CanRead => true;
@@ -71,7 +80,7 @@ internal class PcmStream(
 
                 _bufferPosition += bytesToCopy;
                 totalBytesRead += bytesToCopy;
-                
+
                 // Pacing logic: Wait to align with real-time audio playback.
                 double bytesPerSecond = (double)SampleRate * Channels * BytesPerSample;
                 double expectedMilliseconds = (bytesToCopy / bytesPerSecond) * 1000.0;
@@ -106,10 +115,10 @@ internal class PcmStream(
                 {
                     try
                     {
+                        log.Information("{From}> #{MessageId} (-{Delay}) Сообщение готовится к отправке", info.Peer, info.Id, info.Delay());
                         _pendingMessagePcm = await DecodeOggToPcm(info.FilePath);
                         _messageInfo = info;
-                        log.Information("{From}> #{MessageId} (-{Delay}) Сообщение готово к отправке", info.Peer,
-                            info.Id, info.Delay());
+                        log.Information("{From}> #{MessageId} (-{Delay}) Сообщение готово к отправке", info.Peer, info.Id, info.Delay());
                         _messagePosition = 0;
                         File.Delete(info.FilePath);
                     }
@@ -138,7 +147,7 @@ internal class PcmStream(
                     _messagePosition = 0;
                     log.Information("{From}> #{MessageId} (-{Delay}) Сообщение передано в стрим", _messageInfo?.Peer,
                         _messageInfo?.Id, _messageInfo?.Delay());
-                    
+
                     Interlocked.Increment(ref AppMetrics.TotalMessagesSend);
                     _messageInfo = null;
                 }
