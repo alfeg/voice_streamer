@@ -4,9 +4,11 @@ using Serilog;
 
 namespace VoiceStreamer;
 
-public class AppMetricReporter(ILogger log)
+public class AppMetricReporter(ILogger log) : IBackgroundService
 {
-    public async Task Start()
+    private readonly ILogger _log = log.ForContext("Module", "[VS] ");
+    
+    public async Task Start(CancellationToken cancellationToken)
     {
         await Task.Yield();
         
@@ -17,7 +19,7 @@ public class AppMetricReporter(ILogger log)
         int delay = 10;
         int NextDelay() => (int)Math.Min(delay * Math.E, 60 * 60);
         
-        while (true)
+        while (cancellationToken.IsCancellationRequested == false)
         {
             if (sw.Elapsed.TotalSeconds < 3)
             {
@@ -40,7 +42,7 @@ public class AppMetricReporter(ILogger log)
                 delay = 60;
             }
 
-            log.Information("Messages: {TotalMessages}, Bytes Sent: {TotalBytes} ({Rate})", 
+            _log.Information("Messages: {TotalMessages}, Bytes Sent: {TotalBytes} ({Rate})", 
                 AppMetrics.TotalMessagesSend, AppMetrics.TotalBytesSend.Bytes().Humanize(),
                 (AppMetrics.TotalBytesSend - prevBytesSend).Bytes().Per(sw.Elapsed).Humanize());
             prevBytesSend = AppMetrics.TotalBytesSend;

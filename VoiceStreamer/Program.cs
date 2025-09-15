@@ -1,9 +1,13 @@
 ﻿using System.Threading.Channels;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Sinks.TelegramBot;
 using Spectre.Console;
 using VoiceStreamer;
+
+var services = new ServiceCollection();
 
 var config = new ConfigurationBuilder()
     .AddJsonFile("appsettings.json", optional: true)
@@ -15,49 +19,52 @@ var config = new ConfigurationBuilder()
     .AddUserSecrets(typeof(Program).Assembly)
     .Build();
 
-var streamConfig = config.GetSection("Streamer").Get<StreamConfig>();
-var telegramConfig = config.GetSection("Telegram").Get<TelegramConfig>();
-
 var loggerConfiguration = new LoggerConfiguration()
     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Module}{Message:lj}{NewLine}{Exception}");
 
-if (!string.IsNullOrWhiteSpace(telegramConfig?.BotToken) && !string.IsNullOrWhiteSpace(telegramConfig.BotChatId))
-{
-    loggerConfiguration
-        .WriteTo.TelegramBot(telegramConfig.BotToken, telegramConfig.BotChatId);
-}
+services.AddOptions<StreamConfig>()
+    .Bind(config.GetSection(StreamConfig.Section))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
-await using var log = loggerConfiguration.CreateLogger();
-
-if (telegramConfig == null || streamConfig == null)
-{
-    log.Fatal("Ошибка конфиграции. Не хватает секций настройки Telegram клиента или стриминга");
-    Environment.Exit(1);
-}
+services.AddOptions<TelegramConfig>()
+    .Bind(config.GetSection(TelegramConfig.Section))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 var voiceChannel = Channel.CreateUnbounded<VoiceMessageInfo>(new UnboundedChannelOptions
     { SingleReader = true, SingleWriter = false });
 
-if (!Directory.Exists("data"))
+services.AddSingleton(_ => voiceChannel.Reader);
+services.AddSingleton(_ => voiceChannel.Writer);
+services.AddSingleton<ILogger>(sp =>
 {
-    Directory.CreateDirectory("data");
-}
+    var telegramConfig = sp.GetRequiredService<IOptions<TelegramConfig>>().Value;
+
+    if (!string.IsNullOrWhiteSpace(telegramConfig.BotToken) && !string.IsNullOrWhiteSpace(telegramConfig.BotChatId))
+    {
+        loggerConfiguration
+            .WriteTo.TelegramBot(telegramConfig.BotToken, telegramConfig.BotChatId);
+    }
+
+    return loggerConfiguration.CreateLogger();
+});
+
+services.AddScoped<IBackgroundService, TelegramClient>();
+services.AddScoped<IBackgroundService, VoiceStreamerClient>();
+services.AddScoped<IBackgroundService, AppMetricReporter>();
+
+var serviceProvider = services.BuildServiceProvider();
+
+if (!Directory.Exists("data")) Directory.CreateDirectory("data");
 
 AnsiConsole.Write(new FigletText("Voice Streamer").LeftJustified());
 
 try
 {
-    using var telegramClient =
-        new TelegramClient(telegramConfig, voiceChannel.Writer, log.ForContext("Module", "[TG] "));
-    var publisher = new VoiceStreamerClient(streamConfig, voiceChannel.Reader, log.ForContext("Module", "[VS] "));
-    var reporter = new AppMetricReporter(log.ForContext("Module", "[VS] "));
-    
-    log.Information("Ctrl+C для выхода");
-
-    await Task.WhenAll(
-        telegramClient.StartAsync(),
-        publisher.StartStreamingAsync(),
-        reporter.Start());
+    using var scope = serviceProvider.CreateScope();
+    var backgroundServices = scope.ServiceProvider.GetRequiredService<IEnumerable<IBackgroundService>>();
+    await Task.WhenAll(backgroundServices.Select(bs => bs.Start(CancellationToken.None)));
 }
 finally
 {
