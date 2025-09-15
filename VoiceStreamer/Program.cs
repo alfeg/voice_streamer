@@ -1,5 +1,4 @@
-﻿using System.Diagnostics.Metrics;
-using System.Threading.Channels;
+﻿using System.Threading.Channels;
 using Microsoft.Extensions.Configuration;
 using Serilog;
 using Serilog.Sinks.TelegramBot;
@@ -22,13 +21,19 @@ var telegramConfig = config.GetSection("Telegram").Get<TelegramConfig>();
 var loggerConfiguration = new LoggerConfiguration()
     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Module}{Message:lj}{NewLine}{Exception}");
 
-if (!string.IsNullOrWhiteSpace(telegramConfig.BotToken) && !string.IsNullOrWhiteSpace(telegramConfig.BotChatId))
+if (!string.IsNullOrWhiteSpace(telegramConfig?.BotToken) && !string.IsNullOrWhiteSpace(telegramConfig.BotChatId))
 {
     loggerConfiguration
         .WriteTo.TelegramBot(telegramConfig.BotToken, telegramConfig.BotChatId);
 }
 
 await using var log = loggerConfiguration.CreateLogger();
+
+if (telegramConfig == null || streamConfig == null)
+{
+    log.Fatal("Ошибка конфиграции. Не хватает секций настройки Telegram клиента или стриминга");
+    Environment.Exit(1);
+}
 
 var voiceChannel = Channel.CreateUnbounded<VoiceMessageInfo>(new UnboundedChannelOptions
     { SingleReader = true, SingleWriter = false });
@@ -47,7 +52,7 @@ try
     var publisher = new VoiceStreamerClient(streamConfig, voiceChannel.Reader, log.ForContext("Module", "[VS] "));
     var reporter = new AppMetricReporter(log.ForContext("Module", "[VS] "));
     
-    log.Information("Ctrl+C для выхода.");
+    log.Information("Ctrl+C для выхода");
 
     await Task.WhenAll(
         telegramClient.StartAsync(),

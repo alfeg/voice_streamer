@@ -15,11 +15,11 @@ internal class PcmStream(
 {
     private readonly byte[] _silenceChunk = new byte[ChunkBytes];
     private readonly byte[] _buffer = new byte[ChunkBytes]; // Single chunk buffer
-    private int _bufferPosition = 0;
-    private int _bufferLength = 0;
+    private int _bufferPosition;
+    private int _bufferLength;
     private bool _isDisposed;
-    private byte[] _pendingMessagePcm = null;
-    private int _messagePosition = 0;
+    private byte[]? _pendingMessagePcm;
+    private int _messagePosition;
 
     private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
     private VoiceMessageInfo? _messageInfo;
@@ -31,9 +31,9 @@ internal class PcmStream(
     private const double ChunkDurationSec = 0.4; // 100ms chunks for smooth pacing
     private const int ChunkBytes = (int)(SampleRate * ChunkDurationSec * Channels * BytesPerSample);
 
-    static readonly Random rnd = new Random();
+    private static readonly Random Rnd = new Random();
 
-    private bool _noiseFilled = false;
+    private bool _noiseFilled;
     
     private void FillWithNoise(byte[] buffer)
     {
@@ -45,7 +45,7 @@ internal class PcmStream(
         for (int i = 0; i < buffer.Length; i += 2)
         {
             // Generate random s16le samples (-32768 to 32767) at low amplitude (±1000 for subtle noise)
-            var sample = config.DisableNoise ? (short)0 : (short)(rnd.Next(0, 1000));
+            var sample = config.DisableNoise ? (short)0 : (short)(Rnd.Next(0, 1000));
             buffer[i] = (byte)(sample & 0xFF); // Low byte
             buffer[i + 1] = (byte)((sample >> 8) & 0xFF); // High byte
         }

@@ -9,15 +9,22 @@ namespace VoiceStreamer;
 public class TelegramClient(TelegramConfig config, ChannelWriter<VoiceMessageInfo> voiceChannel, ILogger log)
     : IDisposable
 {
-    private Client _client;
-    private UpdateManager _manager;
+    private Client? _client;
+    private UpdateManager? _manager;
 
     public async Task StartAsync()
     {
-        Helpers.Log = (i, message) => log.Verbose(message);
+        if (config.ApiHash == null || config.ApiId == null)
+        {
+            log.Fatal("Telegram__ApiHash и Telegram__Api обязательные параметры");
+            Environment.Exit(1);
+        }
+        
+        // ReSharper disable once TemplateIsNotCompileTimeConstantProblem
+        Helpers.Log = (_, message) => log.Verbose(message);
 
         log.Information("Запускаем соединение с Telegram. AppId: {AppId}, AppHash: {AppHash}",
-            config.ApiId.ToString().Obfuscate(), config.ApiHash.Obfuscate());
+            config.ApiId.ToString()!.Obfuscate(), config.ApiHash.Obfuscate());
 
         _client = new Client(what => what switch
             {
@@ -35,7 +42,11 @@ public class TelegramClient(TelegramConfig config, ChannelWriter<VoiceMessageInf
         var myself = await _client.LoginUserIfNeeded();
 
         log.Information("Авторизован как: {User}",
-            myself switch { User u => $"{u.first_name} {u.last_name}", _ => "User" });
+            myself switch
+            {
+                { } u => $"{u.first_name} {u.last_name}",
+                _ => "User"
+            });
         log.Information("Следим за каналом: {Channel}", config.ChannelToWatch);
     }
 
@@ -63,12 +74,8 @@ public class TelegramClient(TelegramConfig config, ChannelWriter<VoiceMessageInf
         {
             case UpdateNewMessage unm: await HandleMessage(unm.message); break;
             case UpdateEditMessage uem: await HandleMessage(uem.message, true); break;
-            //case UpdateUserStatus uus:
-            //Console.WriteLine($"{User(uus.user_id)} is now {uus.status.GetType().Name[10..]}"); break;
         }
     }
-
-    private string User(long id) => _manager.Users.TryGetValue(id, out var user) ? user.ToString() : $"User {id}";
 
     readonly List<long> _downloadedFiles = new();
 
@@ -101,7 +108,7 @@ public class TelegramClient(TelegramConfig config, ChannelWriter<VoiceMessageInf
 
     private string Peer(Peer peer)
     {
-        var chat = _manager.UserOrChat(peer);
+        var chat = _manager?.UserOrChat(peer);
         if (chat?.MainUsername != null)
         {
             return "@" + chat.MainUsername;
@@ -112,6 +119,11 @@ public class TelegramClient(TelegramConfig config, ChannelWriter<VoiceMessageInf
 
     private async Task DownloadVoiceAsync(Document document, long messageId, string peer, DateTime timestamp)
     {
+        if (_client == null)
+        {
+            throw new ApplicationException("Telegram клиент не инициализорован");
+        }
+        
         try
         {
             if (!Directory.Exists("data/downloads"))

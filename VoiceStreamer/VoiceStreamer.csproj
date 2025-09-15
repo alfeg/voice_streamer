@@ -10,7 +10,6 @@
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     </PropertyGroup>
 
-
     <ItemGroup>
       <PackageReference Include="FFMpegCore" Version="5.2.0" />
       <PackageReference Include="Humanizer.Core" Version="2.14.1" />

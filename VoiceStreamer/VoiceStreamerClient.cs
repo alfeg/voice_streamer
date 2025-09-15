@@ -28,7 +28,7 @@ public class VoiceStreamerClient(StreamConfig config, ChannelReader<VoiceMessage
 
         try
         {
-            log.Information("Старт стриминга в {RtmpServerUrl}{StreamingKey}", _config.RtmpServerUrl, _config.RtmpStreamKey.Obfuscate());
+            log.Information("Старт стриминга в {RtmpServerUrl}{StreamingKey}", _config.RtmpServerUrl, _config.RtmpStreamKey?.Obfuscate());
             
             // FFmpeg command: ffmpeg -f s16le -ar 44100 -ac 2 -i pipe:0 -c:a aac -ab 128k -f flv -re rtmp://...
             var arguments = FFMpegArguments
@@ -39,7 +39,6 @@ public class VoiceStreamerClient(StreamConfig config, ChannelReader<VoiceMessage
                             .WithAudioCodec("aac")
                             .WithAudioBitrate(128)
                             .ForceFormat("flv")
-                        //  .WithCustomArgument("-re") // Ensure real-time pacing
                     )
                     .WithLogLevel(FFMpegCore.Enums.FFMpegLogLevel.Info)
                     .NotifyOnOutput(Console.WriteLine)
