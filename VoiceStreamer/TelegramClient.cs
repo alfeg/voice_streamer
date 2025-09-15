@@ -52,7 +52,7 @@ public class TelegramClient(IOptions<TelegramConfig> options,
                 { } u => $"{u.first_name} {u.last_name}",
                 _ => "User"
             });
-        _log.Information("Следим за каналом: {Channel}", _config.ChannelToWatch);
+        _log.Information("Следим за каналом(ами): {Channel}", _config.ChannelsToWatch);
     }
 
     private string? HandleVerificationCode(string what)
@@ -83,10 +83,13 @@ public class TelegramClient(IOptions<TelegramConfig> options,
     }
 
     readonly List<long> _downloadedFiles = new();
+    
+    readonly HashSet<string> _channelsToWatch = options.Value.ChannelsToWatch?.Split(",", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        .ToHashSet() ?? [];
 
     private async Task HandleMessage(MessageBase messageBase, bool edit = false)
     {
-        if (Peer(messageBase.Peer) != _config.ChannelToWatch)
+        if (!_channelsToWatch.Contains(Peer(messageBase.Peer)))
         {
             return;
         }

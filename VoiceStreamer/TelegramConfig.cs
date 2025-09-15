@@ -13,8 +13,8 @@ public record TelegramConfig
     public string? ApiHash { get; set; }
     public string? Code { get; set; }
     
-    [Required(ErrorMessage = "ChannelToWatch обязательный аргумент")]
-    public string? ChannelToWatch { get; set; }
+    [Required(ErrorMessage = "ChannelsToWatch обязательный аргумент")]
+    public string? ChannelsToWatch { get; set; }
     public string? UserId { get; set; }
     
     [Required(ErrorMessage = "AppId обязательный аргумент")]

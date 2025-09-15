@@ -56,6 +56,7 @@ cd VoiceStreamer
    ```env
    Telegram__ApiId=ВАШ_API_ID
    Telegram__ApiHash=ВАШ_API_HASH
+   Telegram__ChannelsToWatch=НАЗВАНИЕ_КАНАЛА_С_СОБАЧКОЙ (@BelgorodDRONE)
    ```
 
 ### 3. Настройка трансляции в Telegram

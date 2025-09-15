@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/Other/">
+    <File Path=".gitignore" />
+    <File Path="Readme.md" />
+    <File Path="run.sh" />
+  </Folder>
+  <Project Path="VoiceStreamer/VoiceStreamer.csproj" />
+</Solution>

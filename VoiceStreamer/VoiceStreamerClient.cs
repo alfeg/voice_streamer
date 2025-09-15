@@ -26,7 +26,7 @@ public class VoiceStreamerClient(IOptions<StreamConfig> config, ChannelReader<Vo
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            var stream = new PcmStream(_oggFileChannel, config.Value, log, _cts.Token);
+            var stream = new PcmStream(_oggFileChannel, config.Value, _log, _cts.Token);
             var audioSource = new StreamPipeSource(stream);
 
             try
