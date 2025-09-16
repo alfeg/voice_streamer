@@ -12,5 +12,7 @@ public record StreamConfig
 
     public bool DisableNoise { get; set; } = false;
 
+    public int StreamOutputBitRate { get; set; } = 128;
+
     public string GetUrl() => $"{RtmpServerUrl}{RtmpStreamKey}";
 }

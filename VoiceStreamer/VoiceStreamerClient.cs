@@ -41,7 +41,7 @@ public class VoiceStreamerClient(IOptions<StreamConfig> config, ChannelReader<Vo
                         )
                         .OutputToUrl(config.Value.GetUrl(), options => options
                             .WithAudioCodec("aac")
-                            .WithAudioBitrate(128)
+                            .WithAudioBitrate(config.Value.StreamOutputBitRate)
                             .ForceFormat("flv")
                         )
                         .WithLogLevel(FFMpegCore.Enums.FFMpegLogLevel.Info)
