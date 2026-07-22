@@ -1,0 +1,45 @@
+# Replayable strip manifest for Max Voice Reader (fork of Komet).
+# One path per line, relative to repo root. Blank lines and #-comments ignored.
+# scripts/strip.sh / strip.ps1 delete each path (git rm -r if tracked, else rm -rf).
+#
+# PREREQUISITE before executing the strip: the app must no longer depend on the
+# Komet frontend shell. That means the "de-shell" refactor must be in place:
+#   - a self-contained lib/frontend_reader/login_screen.dart (phone+OTP+2FA) that
+#     calls accountModule.requestCode/verifyCode/login directly, so Komet's
+#     frontend/screens/auth/* can be removed;
+#   - lib/main.dart init trimmed to drop calls/push/stories/outbox wiring.
+# Until then, keep this manifest as the target and do NOT run the strip.
+
+# ---- whole feature trees (UI) ----
+lib/frontend
+
+# ---- realtime calls / WebRTC ----
+lib/core/calls
+lib/backend/modules/calls.dart
+
+# ---- feature modules not used by the reader ----
+lib/backend/modules/stories.dart
+lib/backend/modules/stickers.dart
+lib/backend/modules/animoji.dart
+lib/backend/modules/polls.dart
+lib/backend/modules/digital_id.dart
+lib/backend/modules/webapp.dart
+lib/backend/modules/complaints.dart
+lib/backend/modules/cloud_storage.dart
+lib/backend/modules/shared_content.dart
+lib/backend/modules/outbox.dart
+lib/backend/modules/links.dart
+
+# ---- media we do not need (voice playback needs only ogg/opus + just_audio) ----
+lib/core/media/rlottie
+lib/core/media/native_video_note_recorder.dart
+lib/core/media/video_note_cropper.dart
+lib/core/nfc
+lib/core/games
+lib/core/push
+
+# Deps to prune from pubspec.yaml after the above (handled separately by strip.sh):
+#   flutter_webrtc, record, opus_dart, opus_flutter_android, video_player,
+#   video_player_media_kit, media_kit_libs_*, firebase_core, firebase_messaging,
+#   flutter_local_notifications, flutter_inappwebview, mobile_scanner, smart_auth,
+#   geolocator, photo_manager, sensors_plus, lottie
