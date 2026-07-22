@@ -6,6 +6,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../backend/modules/chats.dart';
 import '../core/storage/app_database.dart';
 import '../core/storage/token_storage.dart';
+import 'package:komet/frontend_reader/fullscreen_screen.dart';
 import 'package:komet/reader/channel_config.dart';
 import 'package:komet/reader/playback_queue.dart';
 import 'package:komet/reader/reader_service.dart';
@@ -99,6 +100,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           _buildWatchButton(),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const FullscreenScreen()),
+              ),
+              icon: const Icon(Icons.fullscreen),
+              label: const Text('Полный экран'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
           _buildNowPlaying(),
           const SizedBox(height: 16),

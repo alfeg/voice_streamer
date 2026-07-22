@@ -13,6 +13,7 @@ import '../core/storage/token_storage.dart';
 import '../models/attachment.dart';
 import 'package:komet/tts/tts_service.dart';
 import 'package:komet/reader/channel_config.dart';
+import 'package:komet/reader/message_feed.dart';
 import 'package:komet/reader/playback_queue.dart';
 
 class ReaderService {
@@ -179,6 +180,16 @@ class ReaderService {
         final url = att.fileUrl ?? att.baseUrl;
         if (url != null && url.isNotEmpty) {
           debugPrint('[READER] ENQUEUE voice url=$url');
+          MessageFeed.instance.add(
+            FeedItem(
+              id: message.id,
+              title: title,
+              iconUrl: iconUrl,
+              text: 'Голосовое сообщение',
+              isVoice: true,
+              time: DateTime.now(),
+            ),
+          );
           await queue.enqueueVoiceUrl(
             url,
             title: title,
@@ -219,6 +230,17 @@ class ReaderService {
     if (text.length < trimmed.length) {
       debugPrint('[READER] tts: text clipped ${trimmed.length} -> $_maxTtsChars');
     }
+
+    MessageFeed.instance.add(
+      FeedItem(
+        id: message.id,
+        title: title,
+        iconUrl: iconUrl,
+        text: text,
+        isVoice: false,
+        time: DateTime.now(),
+      ),
+    );
 
     final wav = await tts.synthesizeToWav(text, speed: ChannelConfig.speed);
     if (wav != null) {
