@@ -88,6 +88,8 @@ dependencies:
   just_audio: ^0.9.42
   just_audio_background: ^0.0.1-beta.15
   audio_session: ^0.1.21
+  archive: ^4.0.0
+  wakelock_plus: ^1.2.0
 
 dev_dependencies:
   flutter_test:
@@ -137,6 +139,7 @@ flutter:
     - assets/emoji_keywords.json
     - assets/lottie/
     - assets/wallpapers/patterns/
+    - assets/tts/vits-piper-ru_RU-irina-medium.zip
 
   fonts:
     - family: Inter

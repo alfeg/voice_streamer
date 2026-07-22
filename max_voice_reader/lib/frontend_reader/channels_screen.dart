@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import '../backend/modules/chats.dart';
 import '../core/storage/app_database.dart';
 import '../core/storage/token_storage.dart';
-import '../reader/channel_config.dart';
-import 'player_screen.dart';
+import 'package:komet/reader/channel_config.dart';
+import 'package:komet/frontend_reader/player_screen.dart';
 
 class ChannelsScreen extends StatefulWidget {
   const ChannelsScreen({super.key});

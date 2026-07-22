@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
@@ -34,11 +36,15 @@ class TtsService {
       final dataDir = Directory('${voiceDir.path}/espeak-ng-data');
 
       if (!modelFile.existsSync()) {
+        await _provisionFromAsset(voiceDir);
+      }
+
+      if (!modelFile.existsSync()) {
         _ready = false;
         logger.w(
           'TtsService: model not provisioned. Expected model.onnx at '
-          '${modelFile.path}. Provide model.onnx, tokens.txt and '
-          'espeak-ng-data/ under ${voiceDir.path} to enable TTS.',
+          '${modelFile.path}. Bundle assets/tts/$voiceId.zip '
+          '(scripts/fetch_tts_model.ps1) to enable TTS.',
         );
         return false;
       }
@@ -68,6 +74,28 @@ class TtsService {
       _ready = false;
       logger.e('TtsService: init failed', error: e, stackTrace: st);
       return false;
+    }
+  }
+
+  Future<void> _provisionFromAsset(Directory voiceDir) async {
+    final assetKey = 'assets/tts/$voiceId.zip';
+    try {
+      final data = await rootBundle.load(assetKey);
+      final archive = ZipDecoder().decodeBytes(data.buffer.asUint8List());
+      await voiceDir.create(recursive: true);
+      for (final entry in archive) {
+        final outPath = '${voiceDir.path}/${entry.name}';
+        if (entry.isFile) {
+          final file = File(outPath);
+          await file.parent.create(recursive: true);
+          await file.writeAsBytes(entry.content as List<int>);
+        } else {
+          await Directory(outPath).create(recursive: true);
+        }
+      }
+      logger.i('TtsService: provisioned model from $assetKey to ${voiceDir.path}');
+    } catch (e) {
+      logger.w('TtsService: bundled model asset $assetKey unavailable: $e');
     }
   }
 

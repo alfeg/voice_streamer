@@ -75,11 +75,11 @@ import 'frontend/debug/fps_overlay_layer.dart';
 import 'frontend/screens/auth/login_screen.dart';
 import 'frontend/widgets/custom_notification.dart';
 import 'frontend/widgets/theme_reveal.dart';
-import 'frontend_reader/channels_screen.dart';
-import 'reader/channel_config.dart';
-import 'reader/playback_queue.dart';
-import 'reader/reader_service.dart';
-import 'tts/tts_service.dart';
+import 'package:komet/frontend_reader/channels_screen.dart';
+import 'package:komet/reader/channel_config.dart';
+import 'package:komet/reader/playback_queue.dart';
+import 'package:komet/reader/reader_service.dart';
+import 'package:komet/tts/tts_service.dart';
 
 final api = Api();
 final accountModule = AccountModule(api);
@@ -175,6 +175,7 @@ void main(List<String> args) async {
   await PlaybackQueue.instance.init();
   unawaited(TtsService.instance.init());
   ReaderService.instance.init(
+    api: api,
     queue: PlaybackQueue.instance,
     tts: TtsService.instance,
   );
@@ -184,6 +185,10 @@ void main(List<String> args) async {
   }
   attachInfoCacheApi(api);
   chats.attachGlobalPushHandlers(api);
+  api.pushStream.listen((p) {
+    debugPrint('[DIAG] push op=${p.opcode} cmd=${p.cmd} seq=${p.seq}');
+  });
+  api.errorStream.listen((e) => debugPrint('[DIAG] server error: $e'));
   storiesModule.attach();
   unawaited(storiesModule.loadCache());
   unawaited(DeepLinkService.instance.init());
@@ -383,6 +388,7 @@ class KometAppState extends State<KometApp>
     });
 
     _loginStatusSub = accountModule.loginStatusStream.listen((status) async {
+      debugPrint('[DIAG] loginStatus=$status');
       if (status == LoginStatus.success) {
         ReaderService.instance.startWatching();
         DeepLinkService.instance.markReady();

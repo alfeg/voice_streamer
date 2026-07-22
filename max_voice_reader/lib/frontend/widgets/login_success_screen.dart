@@ -4,7 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/utils/haptics.dart';
-import 'adaptive_shell.dart';
+import 'package:komet/frontend_reader/channels_screen.dart';
 
 Future<ImageProvider?> precacheLoginAvatar(
   BuildContext context,
@@ -123,7 +123,7 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen>
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 360),
           reverseTransitionDuration: const Duration(milliseconds: 200),
-          pageBuilder: (_, __, ___) => const AdaptiveShell(),
+          pageBuilder: (_, __, ___) => const ChannelsScreen(),
           transitionsBuilder: (_, animation, __, child) {
             return FadeTransition(
               opacity: CurvedAnimation(

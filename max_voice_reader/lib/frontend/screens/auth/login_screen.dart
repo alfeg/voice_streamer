@@ -16,7 +16,7 @@ import '../profile/spoof_screen.dart';
 import '../profile/debug_menu_screen.dart';
 import '../digital_id/digital_id_web_screen.dart';
 import '../../widgets/custom_notification.dart';
-import '../../widgets/adaptive_shell.dart';
+import 'package:komet/frontend_reader/channels_screen.dart';
 import '../../widgets/sheet_helpers.dart';
 import '../../../backend/api.dart';
 import '../../../core/protocol/packet.dart';
@@ -73,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       if (!mounted) return;
       await Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const AdaptiveShell()),
+        MaterialPageRoute(builder: (_) => const ChannelsScreen()),
         (route) => false,
       );
       return;

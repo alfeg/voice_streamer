@@ -11,12 +11,14 @@ class PlayItem {
   final String subtitle;
   final bool isVoice;
   final String source;
+  final String? iconUrl;
 
   const PlayItem({
     required this.title,
     required this.subtitle,
     required this.isVoice,
     required this.source,
+    this.iconUrl,
   });
 }
 
@@ -25,10 +27,13 @@ class PlaybackQueue {
 
   static final PlaybackQueue instance = PlaybackQueue._();
 
+  static const Duration _idleResetDelay = Duration(seconds: 3);
+
   AudioPlayer? _player;
   final Queue<PlayItem> _pending = Queue<PlayItem>();
   bool _pumping = false;
   double _speed = 1.0;
+  Timer? _idleTimer;
 
   final ValueNotifier<PlayItem?> current = ValueNotifier<PlayItem?>(null);
   final ValueNotifier<int> queueLength = ValueNotifier<int>(0);
@@ -46,9 +51,16 @@ class PlaybackQueue {
     String url, {
     required String title,
     required String subtitle,
+    String? iconUrl,
   }) async {
     _pending.add(
-      PlayItem(title: title, subtitle: subtitle, isVoice: true, source: url),
+      PlayItem(
+        title: title,
+        subtitle: subtitle,
+        isVoice: true,
+        source: url,
+        iconUrl: iconUrl,
+      ),
     );
     _syncQueueLength();
     unawaited(_pump());
@@ -58,9 +70,17 @@ class PlaybackQueue {
     String path, {
     required String title,
     required String subtitle,
+    String? iconUrl,
   }) async {
+    debugPrint('[PLAY] enqueueWav q#${identityHashCode(this)} path=$path');
     _pending.add(
-      PlayItem(title: title, subtitle: subtitle, isVoice: false, source: path),
+      PlayItem(
+        title: title,
+        subtitle: subtitle,
+        isVoice: false,
+        source: path,
+        iconUrl: iconUrl,
+      ),
     );
     _syncQueueLength();
     unawaited(_pump());
@@ -72,6 +92,7 @@ class PlaybackQueue {
   }
 
   Future<void> stop() async {
+    _idleTimer?.cancel();
     _pending.clear();
     _syncQueueLength();
     try {
@@ -83,8 +104,10 @@ class PlaybackQueue {
   }
 
   Future<void> _pump() async {
+    debugPrint('[PLAY] _pump enter q#${identityHashCode(this)} pumping=$_pumping');
     if (_pumping) return;
     _pumping = true;
+    _idleTimer?.cancel();
 
     final player = _player ??= AudioPlayer();
 
@@ -92,45 +115,55 @@ class PlaybackQueue {
       while (_pending.isNotEmpty) {
         final item = _pending.removeFirst();
         _syncQueueLength();
+        _idleTimer?.cancel();
         current.value = item;
 
+        final started = DateTime.now();
+        debugPrint(
+          '[PLAY] start ${item.isVoice ? "voice" : "tts"} "${item.title}" '
+          'pendingLeft=${_pending.length} src=${item.source}',
+        );
         try {
+          await player.stop();
           if (item.isVoice) {
             await player.setUrl(item.source);
           } else {
             await player.setFilePath(item.source);
           }
           await player.setSpeed(_speed);
-          await player.play();
-          await _awaitCompletion(player);
+          await _playToEnd(player);
+          debugPrint(
+            '[PLAY] done "${item.title}" in '
+            '${DateTime.now().difference(started).inMilliseconds}ms',
+          );
         } catch (e) {
+          debugPrint('[PLAY] FAILED "${item.title}" src=${item.source}: $e');
           logger.w('PlaybackQueue: failed to play ${item.source}: $e');
+        } finally {
+          try {
+            await player.stop();
+          } catch (_) {}
         }
       }
     } finally {
-      current.value = null;
       _pumping = false;
+      _scheduleIdleReset();
     }
   }
 
-  Future<void> _awaitCompletion(AudioPlayer player) async {
-    final completer = Completer<void>();
-    late final StreamSubscription<PlayerState> sub;
-    sub = player.playerStateStream.listen(
-      (state) {
-        if (state.processingState == ProcessingState.completed) {
-          if (!completer.isCompleted) completer.complete();
-        }
-      },
-      onError: (Object e) {
-        if (!completer.isCompleted) completer.complete();
-      },
-    );
-    try {
-      await completer.future;
-    } finally {
-      await sub.cancel();
-    }
+  void _scheduleIdleReset() {
+    _idleTimer?.cancel();
+    _idleTimer = Timer(_idleResetDelay, () {
+      if (!_pumping && _pending.isEmpty) {
+        debugPrint('[PLAY] idle reset -> current=null');
+        current.value = null;
+      }
+    });
+  }
+
+  Future<void> _playToEnd(AudioPlayer player) async {
+    debugPrint('[PLAY] duration=${player.duration} state=${player.processingState}');
+    await player.play();
   }
 
   void _syncQueueLength() => queueLength.value = _pending.length;

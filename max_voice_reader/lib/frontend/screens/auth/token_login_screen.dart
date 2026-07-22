@@ -5,7 +5,7 @@ import '../../../core/storage/spoofing_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../main.dart';
 import '../../../models/spoof_profile.dart';
-import '../../widgets/adaptive_shell.dart';
+import 'package:komet/frontend_reader/channels_screen.dart';
 import '../../widgets/custom_notification.dart';
 import '../../widgets/section_header.dart';
 
@@ -102,7 +102,7 @@ class _TokenLoginScreenState extends State<TokenLoginScreen> {
       await accountModule.loginWithToken(_tokenController.text.trim());
       if (!mounted) return;
       await Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const AdaptiveShell()),
+        MaterialPageRoute(builder: (_) => const ChannelsScreen()),
         (route) => false,
       );
     } catch (e) {

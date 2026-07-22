@@ -3,106 +3,228 @@ import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 
+import '../backend/api.dart';
 import '../backend/modules/chats.dart';
 import '../backend/modules/messages.dart';
+import '../core/protocol/opcode_map.dart';
+import '../core/protocol/packet.dart';
+import '../core/storage/app_database.dart';
+import '../core/storage/token_storage.dart';
 import '../models/attachment.dart';
-import '../tts/tts_service.dart';
-import 'channel_config.dart';
-import 'playback_queue.dart';
+import 'package:komet/tts/tts_service.dart';
+import 'package:komet/reader/channel_config.dart';
+import 'package:komet/reader/playback_queue.dart';
 
 class ReaderService {
   ReaderService._();
 
   static final ReaderService instance = ReaderService._();
 
-  static const int _dedupeLimit = 200;
+  static const int _dedupeLimit = 500;
+  static const int _maxTtsChars = 300;
 
+  Api? _api;
   PlaybackQueue? _queue;
   TtsService? _tts;
-  StreamSubscription<MessageEvent>? _subscription;
+  StreamSubscription<Packet>? _subscription;
 
   final Queue<String> _seenOrder = Queue<String>();
   final Set<String> _seen = <String>{};
 
   final ValueNotifier<bool> watching = ValueNotifier<bool>(false);
 
-  void init({required PlaybackQueue queue, required TtsService tts}) {
+  void init({
+    required Api api,
+    required PlaybackQueue queue,
+    required TtsService tts,
+  }) {
+    _api = api;
     _queue = queue;
     _tts = tts;
   }
 
   void startWatching() {
     if (watching.value) return;
+    final api = _api;
     final queue = _queue;
-    if (queue == null) return;
+    if (api == null || queue == null) return;
 
     queue.setSpeed(ChannelConfig.speed);
-    _subscription = chats.messageEvents.listen(_onEvent);
+    _subscription = api.pushStream.listen(_onPush);
     watching.value = true;
+    debugPrint('[READER] watching STARTED, modes=${ChannelConfig.all}');
+    _subscribeWatchedChannels(api);
+  }
+
+  Future<void> _subscribeWatchedChannels(Api api) async {
+    for (final entry in ChannelConfig.all.entries) {
+      if (entry.value == WatchMode.off) continue;
+      debugPrint('[READER] chatSubscribe -> ${entry.key}');
+      await chats.subscribeChat(api, entry.key, subscribe: true);
+    }
   }
 
   void stopWatching() {
     _subscription?.cancel();
     _subscription = null;
     watching.value = false;
+    debugPrint('[READER] watching STOPPED');
   }
 
-  Future<void> _onEvent(MessageEvent event) async {
-    if (event is! MessageAddedEvent) return;
+  Future<void> _onPush(Packet packet) async {
+    debugPrint('[READER] push opcode=${packet.opcode} (${Opcode.name(packet.opcode)})');
+    if (packet.opcode != Opcode.notifMessage) return;
 
-    final chatId = event.chatId;
-    final message = event.message;
+    try {
+      final payload = packet.payload;
+      if (payload is! Map) {
+        debugPrint('[READER] notifMessage: payload not a Map: $payload');
+        return;
+      }
+      final chatId = payload['chatId'];
+      final rawMsg = payload['message'];
+      debugPrint(
+        '[READER] notifMessage chatId=$chatId '
+        'msgKeys=${rawMsg is Map ? rawMsg.keys.toList() : rawMsg}',
+      );
+      if (chatId is! int) {
+        debugPrint('[READER] skip: chatId not int ($chatId)');
+        return;
+      }
+      if (rawMsg is! Map) {
+        debugPrint('[READER] skip: message not a Map');
+        return;
+      }
 
-    final mode = ChannelConfig.modeFor(chatId);
-    if (mode == WatchMode.off) return;
+      final mode = ChannelConfig.modeFor(chatId);
+      debugPrint('[READER] chat $chatId mode=$mode');
+      if (mode == WatchMode.off) {
+        debugPrint('[READER] skip: chat $chatId is OFF (not watched)');
+        return;
+      }
 
-    if (_alreadySeen(message.id)) return;
-    _markSeen(message.id);
+      final msgId = rawMsg['id']?.toString();
+      if (msgId == null) {
+        debugPrint('[READER] skip: message has no id');
+        return;
+      }
+      if (_alreadySeen(msgId)) {
+        debugPrint('[READER] skip: duplicate id=$msgId');
+        return;
+      }
+      _markSeen(msgId);
 
-    final title = chatId.toString();
+      final accountId = await TokenStorage.getActiveAccountId();
+      if (accountId == null) {
+        debugPrint('[READER] skip: no active account');
+        return;
+      }
 
-    if (mode == WatchMode.voice || mode == WatchMode.both) {
-      await _handleVoice(message, title);
-    }
+      final message = CachedMessage.fromPushPayload(accountId, chatId, rawMsg);
+      final attachTypes =
+          message.attachments?.map((a) => a.type).toList() ?? const [];
+      debugPrint(
+        '[READER] msg id=${message.id} text="${message.text}" '
+        'attaches=$attachTypes',
+      );
 
-    if (mode == WatchMode.tts || mode == WatchMode.both) {
-      await _handleText(message, title);
+      final chat = await _resolveChat(accountId, chatId);
+      final title = chat?.title ?? 'Канал $chatId';
+      final iconUrl = chat?.iconUrl;
+
+      if (mode == WatchMode.voice || mode == WatchMode.both) {
+        await _handleVoice(message, title, iconUrl);
+      }
+
+      if (mode == WatchMode.tts || mode == WatchMode.both) {
+        await _handleText(message, title, iconUrl);
+      }
+    } catch (e, st) {
+      debugPrint('[READER] push handling failed: $e\n$st');
     }
   }
 
-  Future<void> _handleVoice(CachedMessage message, String title) async {
+  Future<CachedChat?> _resolveChat(int accountId, int chatId) async {
+    try {
+      final rows = await AppDatabase.loadChat(accountId, chatId);
+      if (rows.isEmpty) return null;
+      return CachedChat.fromDbRow(rows.first);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _handleVoice(
+    CachedMessage message,
+    String title,
+    String? iconUrl,
+  ) async {
     final queue = _queue;
     if (queue == null) return;
 
     final attachments = message.attachments;
-    if (attachments == null) return;
+    if (attachments == null) {
+      debugPrint('[READER] voice: no attachments');
+      return;
+    }
 
     for (final att in attachments) {
       if (att is AudioAttachment || att.type == AttachmentType.audio) {
         final url = att.fileUrl ?? att.baseUrl;
         if (url != null && url.isNotEmpty) {
+          debugPrint('[READER] ENQUEUE voice url=$url');
           await queue.enqueueVoiceUrl(
             url,
             title: title,
             subtitle: 'Голосовое сообщение',
+            iconUrl: iconUrl,
           );
           return;
         }
+        debugPrint('[READER] voice attach has no url: fileUrl=${att.fileUrl} baseUrl=${att.baseUrl}');
       }
     }
+    debugPrint('[READER] voice: no AUDIO attachment found');
   }
 
-  Future<void> _handleText(CachedMessage message, String title) async {
+  Future<void> _handleText(
+    CachedMessage message,
+    String title,
+    String? iconUrl,
+  ) async {
     final queue = _queue;
     final tts = _tts;
     if (queue == null || tts == null) return;
 
-    final text = message.text;
-    if (text == null || text.trim().isEmpty) return;
+    final raw = message.text;
+    if (raw == null || raw.trim().isEmpty) {
+      debugPrint('[READER] tts: empty text, skip');
+      return;
+    }
+    if (!tts.isReady) {
+      debugPrint('[READER] tts: engine NOT ready (model not provisioned), skip');
+      return;
+    }
+
+    final trimmed = raw.trim();
+    final text = trimmed.length > _maxTtsChars
+        ? '${trimmed.substring(0, _maxTtsChars)}…'
+        : trimmed;
+    if (text.length < trimmed.length) {
+      debugPrint('[READER] tts: text clipped ${trimmed.length} -> $_maxTtsChars');
+    }
 
     final wav = await tts.synthesizeToWav(text, speed: ChannelConfig.speed);
     if (wav != null) {
-      await queue.enqueueWav(wav, title: title, subtitle: text);
+      debugPrint('[READER] ENQUEUE tts wav=$wav');
+      await queue.enqueueWav(
+        wav,
+        title: title,
+        subtitle: text,
+        iconUrl: iconUrl,
+      );
+    } else {
+      debugPrint('[READER] tts: synth returned null');
     }
   }
 
