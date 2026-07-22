@@ -85,11 +85,16 @@ jobs:
 
       - name: Rename APKs with version
         run: |
+          set -euo pipefail
           cd build/app/outputs/flutter-apk
-          for f in app-komet-*-release.apk; do
-            abi="${f#app-komet-}"; abi="${abi%-release.apk}"
+          shopt -s nullglob
+          found=0
+          for f in app-*-komet-release.apk; do
+            abi="${f#app-}"; abi="${abi%-komet-release.apk}"
             mv "$f" "MaxReader-${{ steps.ver.outputs.name }}-$abi.apk"
+            found=1
           done
+          [ "$found" = 1 ] || { echo "no release APKs found"; ls -lh; exit 1; }
           ls -lh
 
       - name: Publish GitHub Release
