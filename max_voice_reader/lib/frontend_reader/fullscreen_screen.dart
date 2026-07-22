@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,12 +16,20 @@ class FullscreenScreen extends StatefulWidget {
 
 class _FullscreenScreenState extends State<FullscreenScreen> {
   static const int _visible = 6;
+  static const double _holdSeconds = 40;
+  static const double _fadeSeconds = 60;
+  static const double _floorOpacity = 0.12;
+
   bool _prevWakelock = false;
+  Timer? _ticker;
 
   @override
   void initState() {
     super.initState();
     _enter();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _enter() async {
@@ -30,9 +40,17 @@ class _FullscreenScreenState extends State<FullscreenScreen> {
 
   @override
   void dispose() {
+    _ticker?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     if (!_prevWakelock) WakelockPlus.disable();
     super.dispose();
+  }
+
+  double _ageOpacity(DateTime time) {
+    final age = DateTime.now().difference(time).inMilliseconds / 1000.0;
+    if (age <= _holdSeconds) return 1.0;
+    final t = (age - _holdSeconds) / _fadeSeconds;
+    return (1.0 - t).clamp(_floorOpacity, 1.0);
   }
 
   String _time(DateTime t) =>
@@ -68,7 +86,18 @@ class _FullscreenScreenState extends State<FullscreenScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          for (var i = 0; i < count; i++) _row(items[i], i),
+                          for (var i = 0; i < count; i++)
+                            TweenAnimationBuilder<double>(
+                              key: ValueKey(items[i].id),
+                              tween: Tween<double>(begin: 0.0, end: 1.0),
+                              duration: const Duration(milliseconds: 450),
+                              curve: Curves.easeOut,
+                              builder: (context, t, child) => Transform.translate(
+                                offset: Offset(0, (1 - t) * -24),
+                                child: Opacity(opacity: t, child: child),
+                              ),
+                              child: _row(items[i], i),
+                            ),
                         ],
                       ),
                     );
@@ -91,13 +120,13 @@ class _FullscreenScreenState extends State<FullscreenScreen> {
   }
 
   Widget _row(FeedItem item, int depth) {
-    final opacity = (1.0 - depth * 0.22).clamp(0.14, 1.0);
     final textSize = (36.0 - depth * 7.0).clamp(15.0, 36.0);
     final titleSize = (18.0 - depth * 2.0).clamp(11.0, 18.0);
     final url = item.iconUrl;
 
-    return Opacity(
-      opacity: opacity,
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 800),
+      opacity: _ageOpacity(item.time),
       child: Padding(
         padding: const EdgeInsets.only(bottom: 20),
         child: Column(
