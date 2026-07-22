@@ -121,12 +121,15 @@ class TtsService {
     }
   }
 
+  static const int _leadSilenceMs = 300;
+
   Uint8List _encodeWav(Float32List samples, int sampleRate) {
     const channels = 1;
     const bitsPerSample = 16;
     final byteRate = sampleRate * channels * bitsPerSample ~/ 8;
     final blockAlign = channels * bitsPerSample ~/ 8;
-    final dataSize = samples.length * 2;
+    final padSamples = (sampleRate * _leadSilenceMs / 1000).round();
+    final dataSize = (padSamples + samples.length) * 2;
     final totalSize = 44 + dataSize;
 
     final bytes = Uint8List(totalSize);
@@ -146,7 +149,7 @@ class TtsService {
     _writeAscii(bytes, 36, 'data');
     view.setUint32(40, dataSize, Endian.little);
 
-    var offset = 44;
+    var offset = 44 + padSamples * 2;
     for (final sample in samples) {
       var value = (sample * 32767.0).round();
       if (value > 32767) value = 32767;
