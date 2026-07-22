@@ -68,8 +68,6 @@ dependencies:
   url_launcher: ^6.3.1
   app_links: ^7.0.0
   video_player: ^2.9.2
-  firebase_core: ^4.1.1
-  firebase_messaging: ^16.0.2
   flutter_local_notifications: ^22.0.1
   flutter_inappwebview: ^6.1.5
   flutter_webrtc: ^1.5.2
@@ -106,20 +104,20 @@ dev_dependencies:
   plugin_platform_interface: ^2.1.0
 
 flutter_launcher_icons:
-  image_path: "assets/komet_icon.png"
+  image_path: "assets/meteor_icon.png"
   android: "ic_launcher"
   ios: true
   remove_alpha_ios: true
-  background_color_ios: "#000000"
-  adaptive_icon_background: "#000000"
-  adaptive_icon_foreground: "assets/komet.png"
+  background_color_ios: "#0A3D62"
+  adaptive_icon_background: "#0A3D62"
+  adaptive_icon_foreground: "assets/meteor_icon.png"
   windows:
     generate: true
-    image_path: "assets/komet_icon.png"
+    image_path: "assets/meteor_icon.png"
     icon_size: 256
   macos:
     generate: true
-    image_path: "assets/komet_icon.png"
+    image_path: "assets/meteor_icon.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

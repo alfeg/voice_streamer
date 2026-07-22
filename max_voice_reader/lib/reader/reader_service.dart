@@ -44,15 +44,21 @@ class ReaderService {
   }
 
   void startWatching() {
-    if (watching.value) return;
     final api = _api;
     final queue = _queue;
     if (api == null || queue == null) return;
 
+    _subscription?.cancel();
+    _subscription = null;
+
     queue.setSpeed(ChannelConfig.speed);
     _subscription = api.pushStream.listen(_onPush);
     watching.value = true;
-    debugPrint('[READER] watching STARTED, modes=${ChannelConfig.all}');
+    debugPrint(
+      '[READER] watching STARTED reader#${identityHashCode(this)} '
+      'api#${identityHashCode(api)} queue#${identityHashCode(queue)} '
+      'modes=${ChannelConfig.all}',
+    );
     _subscribeWatchedChannels(api);
   }
 
@@ -72,7 +78,7 @@ class ReaderService {
   }
 
   Future<void> _onPush(Packet packet) async {
-    debugPrint('[READER] push opcode=${packet.opcode} (${Opcode.name(packet.opcode)})');
+    debugPrint('[READER] reader#${identityHashCode(this)} push opcode=${packet.opcode} (${Opcode.name(packet.opcode)})');
     if (packet.opcode != Opcode.notifMessage) return;
 
     try {

@@ -6,7 +6,6 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
 }
 
 val keystoreProperties = Properties()
@@ -32,7 +31,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "ru.komet.app"
+        applicationId = "ru.maxvoice.reader"
         minSdk = maxOf(flutter.minSdkVersion, 23)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -45,7 +44,7 @@ android {
         create("komet") {
             dimension = "distribution"
             isDefault = true
-            applicationId = "ru.komet.app"
+            applicationId = "ru.maxvoice.reader"
         }
         create("oneme") {
             dimension = "distribution"
@@ -90,7 +89,5 @@ dependencies {
     implementation("androidx.media3:media3-transformer:1.9.3")
     implementation("androidx.media3:media3-effect:1.9.3")
     implementation("androidx.media3:media3-common:1.9.3")
-    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
-    implementation("com.google.firebase:firebase-messaging")
     implementation("androidx.core:core-ktx:1.13.1")
 }

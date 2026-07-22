@@ -27,9 +27,9 @@ Level _minimumLogLevel() {
       break;
   }
   if (kReleaseMode) {
-    return Level.info;
+    return Level.warning;
   }
-  return Level.trace;
+  return Level.warning;
 }
 
 LogFilter _logFilter() {

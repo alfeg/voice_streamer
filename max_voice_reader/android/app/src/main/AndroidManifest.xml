@@ -28,7 +28,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
     <application
-        android:label="Komet"
+        android:label="MaxReader"
         android:name="${applicationName}"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher">
@@ -36,7 +36,7 @@
             android:name="ru.komet.app.MainActivity"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
-            android:label="Komet"
+            android:label="MaxReader"
             android:launchMode="singleTop"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
@@ -76,8 +76,8 @@
             android:name="ru.komet.app.MinimalIcon"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_minimal"
-            android:label="Komet"
+            android:icon="@mipmap/ic_launcher"
+            android:label="MaxReader"
             android:targetActivity="ru.komet.app.MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -101,16 +101,6 @@
                 android:name="android.nfc.cardemulation.host_apdu_service"
                 android:resource="@xml/komet_nfc_apdu"/>
         </service>
-        <service
-            android:name=".KometFcmService"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.firebase.MESSAGING_EVENT" />
-            </intent-filter>
-        </service>
-        <service
-            android:name="io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingService"
-            tools:node="remove" />
         <service
             android:name=".CallForegroundService"
             android:foregroundServiceType="microphone"
