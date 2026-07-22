@@ -631,20 +631,6 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: Icon(Symbols.qr_code_2, color: cs.onSurface),
-                  title: Text(
-                    l10n.loginSignInWithQr,
-                    style: TextStyle(
-                      color: cs.onSurface,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                ),
-                ListTile(
                   leading: Icon(Symbols.key, color: cs.onSurface),
                   title: Text(
                     l10n.loginSignInWithToken,
@@ -664,20 +650,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     );
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Symbols.description, color: cs.onSurface),
-                  title: Text(
-                    l10n.loginSignInWithSessionFile,
-                    style: TextStyle(
-                      color: cs.onSurface,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
                   },
                 ),
               ],
@@ -787,6 +759,19 @@ class _LoginScreenState extends State<LoginScreen> {
                                     fontSize: 16,
                                     fontWeight: FontWeight.w400,
                                     height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  'MaxReader — урезанный форк Komet '
+                                  'для озвучки каналов. Не связан с MAX/VK.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: cs.onSurfaceVariant.withValues(
+                                      alpha: 0.7,
+                                    ),
+                                    fontSize: 12,
+                                    height: 1.3,
                                   ),
                                 ),
                               ],

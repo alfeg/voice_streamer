@@ -18,7 +18,7 @@ class _FullscreenScreenState extends State<FullscreenScreen> {
   static const int _visible = 6;
   static const double _holdSeconds = 40;
   static const double _fadeSeconds = 60;
-  static const double _floorOpacity = 0.12;
+  static const double _floorOpacity = 0.4;
 
   bool _prevWakelock = false;
   Timer? _ticker;
