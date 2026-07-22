@@ -1,0 +1,56 @@
+name: Build MaxReader APK
+
+on:
+  push:
+    branches: [max-voice-reader, main]
+    paths:
+      - 'max_voice_reader/**'
+      - '.github/workflows/build-maxreader.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: max_voice_reader
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: flutter --version
+
+      - name: Provision Piper RU TTS model (zip asset)
+        env:
+          VOICE: vits-piper-ru_RU-irina-medium
+          BASE: https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models
+        run: |
+          set -euo pipefail
+          mkdir -p assets/tts
+          if [ ! -f "assets/tts/$VOICE.zip" ]; then
+            curl -fL --retry 3 -o /tmp/tts.tar.bz2 "$BASE/$VOICE.tar.bz2"
+            tar xjf /tmp/tts.tar.bz2 -C assets/tts
+            if [ ! -f "assets/tts/$VOICE/model.onnx" ]; then
+              mv "assets/tts/$VOICE"/*.onnx "assets/tts/$VOICE/model.onnx"
+            fi
+            ( cd "assets/tts/$VOICE" && zip -qr "../$VOICE.zip" . )
+          fi
+          ls -lh "assets/tts/$VOICE.zip"
+
+      - run: flutter pub get
+
+      - run: flutter build apk --release --flavor komet --split-per-abi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maxreader-apk
+          path: max_voice_reader/build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
