@@ -6,7 +6,6 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:video_player_media_kit/video_player_media_kit.dart';
 import 'package:komet/l10n/app_localizations.dart';
 import 'package:m3e_collection/m3e_collection.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -47,21 +46,8 @@ import 'core/config/app_digital_id_mode.dart';
 import 'backend/modules/account.dart';
 import 'backend/modules/chats.dart';
 import 'backend/modules/contacts.dart';
-import 'backend/modules/file_uploader.dart';
 import 'backend/modules/messages.dart';
-import 'backend/modules/outbox.dart';
-import 'backend/modules/polls.dart';
-import 'backend/modules/stickers.dart';
-import 'backend/modules/animoji.dart';
-import 'backend/modules/stories.dart';
-import 'backend/modules/self_check.dart';
-import 'backend/modules/shared_content.dart';
-import 'backend/modules/webapp.dart';
-import 'backend/modules/digital_id.dart';
-import 'core/calls/call_bridge.dart';
-import 'core/calls/call_controller.dart';
 import 'core/links/deep_link_service.dart';
-import 'frontend/screens/calls/call_screen.dart';
 import 'core/push/push_service.dart';
 import 'core/storage/app_database.dart';
 import 'core/transport/tls_config.dart';
@@ -84,14 +70,6 @@ import 'package:komet/tts/tts_service.dart';
 final api = Api();
 final accountModule = AccountModule(api);
 final messagesModule = MessagesModule(api);
-final sharedContentModule = SharedContentModule(api);
-final pollsModule = PollsModule(api);
-final stickersModule = StickersModule(api);
-final animojiModule = AnimojiModule(api);
-final webAppModule = WebAppModule(api);
-final digitalIdModule = DigitalIdModule(webAppModule);
-final fileUploader = FileUploader(api: api, messages: messagesModule);
-final storiesModule = StoriesModule(api);
 final RouteObserver<PageRoute<dynamic>> appRouteObserver =
     RouteObserver<PageRoute<dynamic>>();
 
@@ -162,11 +140,6 @@ void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   DebugTest.parse(args);
   _installLogCapture();
-  VideoPlayerMediaKit.ensureInitialized(
-    windows: true,
-    linux: true,
-    macOS: true,
-  );
   if (AppInstance.isNamed) {
     SharedPreferences.setPrefix('flutter.${AppInstance.id}.');
   }
@@ -189,8 +162,6 @@ void main(List<String> args) async {
     debugPrint('[DIAG] push op=${p.opcode} cmd=${p.cmd} seq=${p.seq}');
   });
   api.errorStream.listen((e) => debugPrint('[DIAG] server error: $e'));
-  storiesModule.attach();
-  unawaited(storiesModule.loadCache());
   unawaited(DeepLinkService.instance.init());
 
   final packageInfoFuture = PackageInfo.fromPlatform();
@@ -325,9 +296,6 @@ class KometAppState extends State<KometApp>
   late Locale _locale;
   late String _fontId;
   bool _isLoggingOut = false;
-  bool _shellReady = false;
-  bool _incomingRouteActive = false;
-  IncomingCall? _pendingIncoming;
   late final ValueNotifier<Color?> accentSeed = ValueNotifier(
     widget.initialAccentSeed,
   );
@@ -335,7 +303,6 @@ class KometAppState extends State<KometApp>
   StreamSubscription<SessionExpiredException>? _sessionExpiredSub;
   StreamSubscription<LoginStatus>? _loginStatusSub;
   StreamSubscription<VpnBypassResult>? _vpnBypassSub;
-  StreamSubscription<IncomingCall>? _callIncomingSub;
   StreamSubscription<String>? _serverErrorSub;
   Timer? _scheduleTimer;
   String? _lastVpnNotice;
@@ -393,25 +360,11 @@ class KometAppState extends State<KometApp>
         ReaderService.instance.startWatching();
         DeepLinkService.instance.markReady();
         unawaited(_refreshWallpaperSeed());
-        CallController.instance.init(api);
-        OutboxService.instance.init(api, messagesModule);
-        SelfCheckService.instance.init(api);
-        SelfCheckService.instance.checkNow();
         if (isOnemeFlavor) {
           await PushService.instance.init(api: api, account: accountModule);
           await PushService.instance.onLoginSuccess();
-          await _ensureFullScreenIntentPermission();
         }
       }
-    });
-
-    _callIncomingSub = CallController.instance.incomingCalls.listen(
-      _onIncomingCall,
-    );
-    CallController.instance.appResumed = true;
-    CallBridge.instance.init();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      CallBridge.instance.checkInitialCall();
     });
 
     _sessionExpiredSub = api.sessionExpiredStream.listen((
@@ -479,60 +432,12 @@ class KometAppState extends State<KometApp>
     });
   }
 
-  Future<void> _ensureFullScreenIntentPermission() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('fsi_prompted') ?? false) return;
-    if (await CallBridge.instance.canUseFullScreenIntent()) return;
-    await prefs.setBool('fsi_prompted', true);
-    await CallBridge.instance.openFullScreenIntentSettings();
-  }
-
-  void _onIncomingCall(IncomingCall call) {
-    _pendingIncoming = call;
-    _presentIncomingCall();
-  }
-
-  void markShellReady() {
-    if (_shellReady) return;
-    _shellReady = true;
-    _presentIncomingCall();
-  }
-
-  void _presentIncomingCall() {
-    final call = _pendingIncoming;
-    if (call == null || _incomingRouteActive || !_shellReady) return;
-    final navState = KometApp.navigatorKey.currentState;
-    if (navState == null) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _presentIncomingCall(),
-      );
-      return;
-    }
-    _incomingRouteActive = true;
-    navState
-        .push(
-          MaterialPageRoute(
-            builder: (_) => CallScreen(
-              name: ContactCache.get(call.callerId) ?? call.callerName ?? '',
-              avatarUrl: ContactCache.getAvatar(call.callerId),
-              incoming: call,
-              autoAccept: call.autoAccept,
-            ),
-          ),
-        )
-        .whenComplete(() {
-          _incomingRouteActive = false;
-          if (identical(_pendingIncoming, call)) _pendingIncoming = null;
-        });
-  }
-
   @override
   void dispose() {
     _finishReveal();
     _sessionExpiredSub?.cancel();
     _loginStatusSub?.cancel();
     _vpnBypassSub?.cancel();
-    _callIncomingSub?.cancel();
     _serverErrorSub?.cancel();
     _scheduleTimer?.cancel();
     AppThemeModeConfig.current.removeListener(_onThemeModeChanged);
@@ -553,17 +458,13 @@ class KometAppState extends State<KometApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    CallController.instance.appResumed = state == AppLifecycleState.resumed;
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
       DebugSessionLog.instance.flushNow();
-      SelfCheckService.instance.pause();
     }
     if (state != AppLifecycleState.resumed) return;
     api.wakeUp();
-    SelfCheckService.instance.resume();
-    CallBridge.instance.checkInitialCall();
     if (AppThemeModeConfig.current.value != AppThemeMode.schedule) return;
     _rescheduleSwitch();
     final next = _effectiveThemeMode;
@@ -1009,7 +910,6 @@ class _StartupScreenState extends State<_StartupScreen> {
         context,
         MaterialPageRoute(builder: (_) => const ChannelsScreen()),
       );
-      KometApp.stateOf(context)?.markShellReady();
       return;
     }
 
@@ -1032,7 +932,6 @@ class _StartupScreenState extends State<_StartupScreen> {
       context,
       MaterialPageRoute(builder: (_) => const ChannelsScreen()),
     );
-    KometApp.stateOf(context)?.markShellReady();
   }
 
   Future<int?> _recoverActiveAccount() async {
@@ -1054,7 +953,6 @@ class _StartupScreenState extends State<_StartupScreen> {
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
-      KometApp.stateOf(context)?.markShellReady();
     }
   }
 

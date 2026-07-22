@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 
 import '../../backend/api.dart';
-import '../../frontend/widgets/max_link_handler.dart';
 import '../../main.dart';
 import 'desktop_url_scheme.dart';
 
@@ -52,11 +51,7 @@ class DeepLinkService {
     final pending = _pending;
     if (pending == null || !_ready) return;
     if (api.state != SessionState.online) return;
-    final context = KometApp.navigatorKey.currentContext;
-    if (context == null) return;
-
     _pending = null;
-    tryHandleMaxLink(context, pending);
   }
 
   String? _normalize(Uri uri) {

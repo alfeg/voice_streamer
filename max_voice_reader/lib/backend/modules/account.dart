@@ -11,11 +11,9 @@ import '../../core/storage/spoofing_service.dart';
 import '../../core/storage/token_storage.dart';
 import '../../core/utils/logger.dart';
 import 'chats.dart';
-import 'complaints.dart';
 import 'contacts.dart';
 import 'folders.dart';
 import 'messages.dart';
-import 'webapp.dart';
 
 import 'account/account_models.dart';
 import 'account/privacy_module.dart';
@@ -326,7 +324,6 @@ class AccountModule {
 
     ContactCache.clear();
     TranscriptionCache.clear();
-    ComplaintsModule.clear();
     chats.resetForAccountSwitch();
 
     logger.i('Добавление аккаунта: сессия сброшена, активный аккаунт очищен');
@@ -340,7 +337,6 @@ class AccountModule {
 
     ContactCache.clear();
     TranscriptionCache.clear();
-    ComplaintsModule.clear();
     chats.resetForAccountSwitch();
 
     await _api.connect();
@@ -371,7 +367,6 @@ class AccountModule {
 
     ContactCache.clear();
     TranscriptionCache.clear();
-    ComplaintsModule.clear();
     chats.resetForAccountSwitch();
     await ContactsModule.primeCacheFromDb(accountId);
 
@@ -421,7 +416,6 @@ class AccountModule {
     }
     ContactCache.clear();
     TranscriptionCache.clear();
-    ComplaintsModule.clear();
     chats.resetForAccountSwitch();
   }
 
@@ -658,9 +652,6 @@ class AccountModule {
     final config = data['config'] as Map?;
     final serverConfig = config?['server'] as Map?;
     final userConfig = config?['user'] as Map?;
-    if (serverConfig != null) {
-      await _persistEntryBannerApps(accountId, serverConfig);
-    }
     final yMap = serverConfig?['y-map'] as Map?;
     final whiteListLinks = serverConfig?['white-list-links'] as List?;
     final fileUploadUnsupported =
@@ -689,34 +680,6 @@ class AccountModule {
     };
 
     await AppDatabase.saveLoginInfo(accountId, jsonEncode(info));
-  }
-
-  Future<void> _persistEntryBannerApps(int accountId, Map serverConfig) async {
-    final banners = serverConfig['settings-entry-banners'];
-    if (banners is! List) return;
-    final resolved = <String, int>{};
-    for (final banner in banners) {
-      final items = (banner is Map) ? banner['items'] : null;
-      if (items is! List) continue;
-      for (final item in items) {
-        if (item is! Map) continue;
-        final appId = item['appid'];
-        if (appId is! int) continue;
-        final icon = item['icon']?.toString().toLowerCase() ?? '';
-        for (final entry in EntryBannerApps.iconMatchers.entries) {
-          if (!resolved.containsKey(entry.key) && icon.contains(entry.value)) {
-            resolved[entry.key] = appId;
-          }
-        }
-      }
-    }
-    for (final entry in resolved.entries) {
-      await AppDatabase.setSyncValue(
-        accountId,
-        entry.key,
-        entry.value.toString(),
-      );
-    }
   }
 
   Map<String, dynamic> _extractChatMarker(List<Map> chats) {
