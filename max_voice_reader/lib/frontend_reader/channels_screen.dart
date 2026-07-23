@@ -5,6 +5,7 @@ import '../backend/modules/chats.dart';
 import '../core/storage/app_database.dart';
 import '../core/storage/token_storage.dart';
 import 'package:komet/reader/channel_config.dart';
+import 'package:komet/frontend_reader/about_screen.dart';
 import 'package:komet/frontend_reader/player_screen.dart';
 
 class ChannelsScreen extends StatefulWidget {
@@ -69,6 +70,15 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const PlayerScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'О программе',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AboutScreen()),
               );
             },
           ),
