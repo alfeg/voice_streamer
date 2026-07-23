@@ -69,7 +69,6 @@ import 'package:komet/tts/tts_service.dart';
 
 final api = Api();
 final accountModule = AccountModule(api);
-final messagesModule = MessagesModule(api);
 final RouteObserver<PageRoute<dynamic>> appRouteObserver =
     RouteObserver<PageRoute<dynamic>>();
 
@@ -199,7 +198,6 @@ void main(List<String> args) async {
   await hapticsFuture;
 
   final prefs = await prefsFuture;
-  await FileHistoryCache.load(prefs);
   await DraftStore.instance.load();
   await ArchivedChatsStore.instance.load();
   await KometSettings.load();

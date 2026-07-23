@@ -7,7 +7,6 @@ import '../../core/config/komet_settings.dart';
 import '../../core/protocol/opcode_map.dart';
 import '../../core/protocol/packet.dart';
 import '../../core/cache/info_cache.dart';
-import '../../core/cache/message_session_cache.dart';
 import '../../core/storage/app_database.dart';
 import '../../core/storage/token_storage.dart';
 import '../../core/utils/logger.dart';
@@ -15,8 +14,7 @@ import '../../core/utils/text_format.dart';
 import '../api.dart';
 import 'chat_parsing.dart';
 import 'chat_preview.dart';
-import 'folders.dart';
-import 'messages.dart' show ContactCache, CachedMessage;
+import 'messages.dart' show CachedMessage;
 
 Map<int, int> parseParticipants(dynamic raw) {
   try {
@@ -286,38 +284,6 @@ class CachedChat {
   }
 }
 
-class ChatSearchHit {
-  final int id;
-  final String type;
-  final String? title;
-  final String? avatarUrl;
-  final String? subtitle;
-
-  const ChatSearchHit({
-    required this.id,
-    required this.type,
-    this.title,
-    this.avatarUrl,
-    this.subtitle,
-  });
-}
-
-class MessageSearchHit {
-  final int chatId;
-  final String? messageId;
-  final String? text;
-  final int time;
-  final int senderId;
-
-  const MessageSearchHit({
-    required this.chatId,
-    this.messageId,
-    this.text,
-    required this.time,
-    required this.senderId,
-  });
-}
-
 sealed class MessageEvent {
   final int chatId;
   const MessageEvent(this.chatId);
@@ -353,12 +319,6 @@ class MessageReactionsChangedEvent extends MessageEvent {
   );
 }
 
-class MessageSentEvent extends MessageEvent {
-  final String tempId;
-  final CachedMessage message;
-  const MessageSentEvent(super.chatId, this.tempId, this.message);
-}
-
 class ChatsModule {
   static const int muteOff = 0;
   static const int muteForever = -1;
@@ -374,141 +334,8 @@ class ChatsModule {
 
   int? _paginatedAccountId;
 
-  void emitMessageSent(int chatId, String tempId, CachedMessage message) {
-    _messageEventsController.add(MessageSentEvent(chatId, tempId, message));
-  }
-
-  Future<void> markRead(
-    Api api,
-    int accountId,
-    int chatId,
-    String messageId,
-    int mark,
-  ) async {
-    final rows = await AppDatabase.loadChat(accountId, chatId);
-    if (rows.isEmpty) return;
-    final row = Map<String, dynamic>.from(rows.first);
-    if ((row['unread_count'] as int? ?? 0) == 0) return;
-
-    final msgIdNum = int.tryParse(messageId);
-    if (msgIdNum != null && !KometSettings.antiRead.value) {
-      try {
-        await api.sendRequest(Opcode.chatMark, {
-          'type': 'READ_MESSAGE',
-          'chatId': chatId,
-          'messageId': msgIdNum,
-          'mark': mark,
-        });
-      } catch (_) {}
-    }
-
-    row['unread_count'] = 0;
-    await AppDatabase.saveChats([row]);
-    _bump();
-  }
-
-  Future<void> markReadUpTo(
-    Api api,
-    int accountId,
-    int chatId,
-    String messageId,
-    int mark, {
-    required int remaining,
-  }) async {
-    final msgIdNum = int.tryParse(messageId);
-    if (msgIdNum != null && !KometSettings.antiRead.value) {
-      try {
-        await api.sendRequest(Opcode.chatMark, {
-          'type': 'READ_MESSAGE',
-          'chatId': chatId,
-          'messageId': msgIdNum,
-          'mark': mark,
-        });
-      } catch (_) {}
-    }
-
-    final rows = await AppDatabase.loadChat(accountId, chatId);
-    if (rows.isEmpty) return;
-    final cached = CachedChat.fromDbRow(rows.first);
-    final next = remaining < 0 ? 0 : remaining;
-    final currentMark = cached.participants[accountId] ?? 0;
-    final nextMark = mark > currentMark ? mark : currentMark;
-    if (cached.unreadCount == next && nextMark == currentMark) return;
-    final participants = Map<int, int>.from(cached.participants)
-      ..[accountId] = nextMark;
-    final updated = cached.copyWith(unreadCount: next, participants: participants);
-    await AppDatabase.saveChats([updated.toDbRow()]);
-    _bump();
-  }
-
-  Future<int?> markUnread(Api api, int accountId, int chatId, int mark) async {
-    int? unread;
-    try {
-      final resp = await api.sendRequest(Opcode.chatMark, {
-        'type': 'SET_AS_UNREAD',
-        'chatId': chatId,
-        'mark': mark,
-      });
-      final payload = resp.payload;
-      if (payload is Map) unread = payload['unread'] as int?;
-    } catch (_) {
-      return null;
-    }
-    if (unread == null) return null;
-
-    await _updateChat(accountId, chatId, (chat) {
-      final participants = Map<int, int>.from(chat.participants)
-        ..[accountId] = mark - 1;
-      return chat.copyWith(unreadCount: unread, participants: participants);
-    });
-    return unread;
-  }
-
-  Future<void> applyOutgoing(
-    int accountId,
-    int chatId, {
-    required String messageId,
-    required int time,
-    required String text,
-    required String status,
-    List<Map<String, dynamic>>? elements,
-  }) async {
-    final thisId = int.tryParse(messageId);
-    await _updateChat(accountId, chatId, (chat) {
-      final existingTime = chat.lastMsgTime ?? 0;
-      if (time < existingTime && chat.lastMsgId != thisId) return null;
-      return chat.copyWith(
-        lastMsgId: thisId,
-        lastMsgText: text,
-        lastMsgElements: (elements != null && elements.isNotEmpty)
-            ? jsonEncode(elements)
-            : null,
-        lastMsgTime: time,
-        lastEventTime: time,
-        lastMsgSenderId: accountId,
-        lastMsgStatus: status,
-      );
-    });
-  }
-
   final ValueNotifier<int> chatsChanged = ValueNotifier(0);
   void _bump() => chatsChanged.value = chatsChanged.value + 1;
-
-  Future<bool> _updateChat(
-    int accountId,
-    int chatId,
-    CachedChat? Function(CachedChat chat) mutate,
-  ) async {
-    final rows = await AppDatabase.loadChat(accountId, chatId);
-    if (rows.isEmpty) return false;
-    final updated = mutate(CachedChat.fromDbRow(rows.first));
-    if (updated == null) return false;
-    final row = Map<String, dynamic>.from(rows.first)
-      ..addAll(updated.toDbRow());
-    await AppDatabase.saveChats([row]);
-    _bump();
-    return true;
-  }
 
   static Map<String, dynamic>? _decodePayload(dynamic raw) {
     if (raw is String && raw.isNotEmpty) {
@@ -523,11 +350,6 @@ class ChatsModule {
   StreamSubscription<SessionState>? _globalStateSub;
   Future<void> _pushQueue = Future.value();
 
-  final Set<int> _historyFetched = {};
-
-  bool wasHistoryFetched(int chatId) => _historyFetched.contains(chatId);
-  void markHistoryFetched(int chatId) => _historyFetched.add(chatId);
-
   void attachGlobalPushHandlers(Api api) {
     _globalPushSub?.cancel();
     _globalStateSub?.cancel();
@@ -540,24 +362,18 @@ class ChatsModule {
     _globalStateSub?.cancel();
     _globalPushSub = null;
     _globalStateSub = null;
-    _contactFlushTimer?.cancel();
-    _contactFlushTimer = null;
     _messageEventsController.close();
     chatsChanged.dispose();
   }
 
   void _handleSessionState(SessionState state) {
     if (state == SessionState.disconnected) {
-      ContactInfoFetch.clear();
       PresenceFetch.clear();
       ChatInfoFetch.clear();
-      _historyFetched.clear();
     }
   }
 
   void resetForAccountSwitch() {
-    _historyFetched.clear();
-    ContactInfoFetch.clear();
     PresenceFetch.clear();
     ChatInfoFetch.clear();
   }
@@ -855,76 +671,6 @@ class ChatsModule {
     await AppDatabase.saveChats([newRow]);
   }
 
-  /// Вызывается после успешного фетча истории чата —
-  /// если в превью был placeholder, заменяем его на актуальное
-  /// последнее сообщение из кеша.
-  Future<void> reconcileLastMessageIfPlaceholder(
-    int accountId,
-    int chatId,
-  ) async {
-    final rows = await AppDatabase.loadChat(accountId, chatId);
-    if (rows.isEmpty) return;
-    final chat = CachedChat.fromDbRow(rows.first);
-    if (!chat.isLastMsgDeleted) return;
-    await _reconcileLastMessage(accountId, chatId, rows.first);
-    _bump();
-  }
-
-  Future<void> reconcileLastMessage(int accountId, int chatId) async {
-    final rows = await AppDatabase.loadChat(accountId, chatId);
-    if (rows.isEmpty) return;
-    await _reconcileLastMessage(accountId, chatId, rows.first);
-    _bump();
-  }
-
-  Future<List<String>> reconcileDeletedFromFetch(
-    int accountId,
-    int chatId,
-    List<CachedMessage> serverMessages,
-  ) async {
-    if (serverMessages.isEmpty) return const [];
-
-    final serverIds = <String>{};
-    var minTime = serverMessages.first.time;
-    var maxTime = serverMessages.first.time;
-    for (final m in serverMessages) {
-      serverIds.add(m.id);
-      if (m.time < minTime) minTime = m.time;
-      if (m.time > maxTime) maxTime = m.time;
-    }
-
-    final cached = await AppDatabase.loadMessages(
-      accountId,
-      chatId,
-      limit: 300,
-      onlyVisible: true,
-    );
-
-    final newlyDeleted = <String>[];
-    for (final row in cached) {
-      final id = row['id']?.toString();
-      if (id == null || id.isEmpty || id.startsWith('temp_')) continue;
-      if (serverIds.contains(id)) continue;
-
-      final status = row['status']?.toString();
-      if (status == 'pending' || status == 'sending' || status == 'error') {
-        continue;
-      }
-
-      final time = row['time'] is int
-          ? row['time'] as int
-          : int.tryParse(row['time']?.toString() ?? '') ?? 0;
-      if (time < minTime || time > maxTime) continue;
-
-      newlyDeleted.add(id);
-    }
-
-    if (newlyDeleted.isNotEmpty) {
-      await AppDatabase.markMessagesDeleted(accountId, chatId, newlyDeleted);
-    }
-    return newlyDeleted;
-  }
-
   Future<void> _handleNotifMsgReactionsChanged(Packet packet) async {
     final payload = packet.payload;
     if (payload is! Map) return;
@@ -993,81 +739,6 @@ class ChatsModule {
     cached.participants[userId] = mark;
     await AppDatabase.saveChats([cached.toDbRow()]);
     _bump();
-  }
-
-  final Set<int> _pendingContactUpdates = {};
-  Timer? _contactFlushTimer;
-  Future<void>? _contactFlushFuture;
-  static const _contactFlushDelay = Duration(milliseconds: 250);
-
-  void applyContactUpdate(int contactId) {
-    _pendingContactUpdates.add(contactId);
-    if (_contactFlushTimer != null) return;
-    if (_contactFlushFuture != null) return;
-    _contactFlushTimer = Timer(_contactFlushDelay, _kickFlush);
-  }
-
-  void _kickFlush() {
-    _contactFlushTimer = null;
-    if (_contactFlushFuture != null) return;
-    _contactFlushFuture = _flushContactUpdates().whenComplete(() {
-      _contactFlushFuture = null;
-      if (_pendingContactUpdates.isNotEmpty) {
-        _contactFlushTimer ??= Timer(_contactFlushDelay, _kickFlush);
-      }
-    });
-  }
-
-  Future<void> _flushContactUpdates() async {
-    if (_pendingContactUpdates.isEmpty) return;
-    final ids = _pendingContactUpdates.toList();
-    _pendingContactUpdates.clear();
-
-    final accountId = await TokenStorage.getActiveAccountId();
-    if (accountId == null) return;
-
-    final dialogRows = await AppDatabase.loadDialogChats(accountId);
-    final byParticipant =
-        <int, List<({Map<String, dynamic> row, CachedChat cached})>>{};
-    for (final row in dialogRows) {
-      final cached = CachedChat.fromDbRow(row);
-      for (final pid in cached.participants.keys) {
-        if (pid == accountId) continue;
-        byParticipant.putIfAbsent(pid, () => []).add((
-          row: row,
-          cached: cached,
-        ));
-      }
-    }
-
-    final updates = <Map<String, dynamic>>[];
-    for (final contactId in ids) {
-      final name = ContactCache.get(contactId);
-      if (name == null) continue;
-      final avatar = ContactCache.getAvatar(contactId);
-      final options = ContactCache.getOptions(contactId) ?? const <String>{};
-      final affected = byParticipant[contactId];
-      if (affected == null) continue;
-      for (final entry in affected) {
-        final row = entry.row;
-        final cached = entry.cached;
-        final sameTitle = cached.title == name;
-        final sameAvatar = (cached.iconUrl ?? '') == (avatar ?? '');
-        final sameOptions =
-            cached.options.length == options.length &&
-            cached.options.containsAll(options);
-        if (sameTitle && sameAvatar && sameOptions) continue;
-        final newRow = Map<String, dynamic>.from(row);
-        newRow['title'] = name;
-        newRow['icon_url'] = avatar;
-        newRow['options'] = options.isEmpty ? null : options.join(',');
-        updates.add(newRow);
-      }
-    }
-    if (updates.isNotEmpty) {
-      await AppDatabase.saveChats(updates);
-      _bump();
-    }
   }
 
   Future<CachedChat?> cacheServerChat(
@@ -1232,99 +903,6 @@ class ChatsModule {
     }
   }
 
-  Future<List<CachedChat>> getChats(
-    int accountId, {
-    bool includeHidden = false,
-  }) async {
-    try {
-      final rows = await AppDatabase.loadChats(
-        accountId,
-        includeHidden: includeHidden,
-      );
-      final chats = rows.map(CachedChat.fromDbRow).toList();
-      return chats;
-    } catch (e) {
-      logger.e("Ошибка при получении чатов: $e");
-      return [];
-    }
-  }
-
-  Future<List<CachedChat>> getChat(int accountId, int chatId) async {
-    try {
-      final rows = await AppDatabase.loadChat(accountId, chatId);
-
-      return rows.map(CachedChat.fromDbRow).toList();
-    } catch (e) {
-      logger.e("Ошибка при получении чата: $e");
-
-      return [];
-    }
-  }
-
-  Future<void> clearCache(int accountId) =>
-      AppDatabase.clearChatsCache(accountId);
-
-  Future<Map<String, dynamic>?> getChatInfo(Api api, int chatId) async {
-    final packet = await api.sendRequest(Opcode.chatInfo, {
-      'chatIds': [chatId],
-    });
-    if (packet.isError) return null;
-    final payload = packet.payload as Map?;
-    final chats = payload?['chats'] as List?;
-    if (chats == null || chats.isEmpty) return null;
-    return Map<String, dynamic>.from(chats.first as Map);
-  }
-
-  Future<dynamic> searchById(Api api, int userId) async {
-    final packet = await api.sendRequest(Opcode.publicSearch, {
-      'query': userId.toString(),
-      'from': 0,
-      'count': 10,
-    });
-    return packet.payload;
-  }
-
-  Future<List<MessageSearchHit>> searchMessages(
-    Api api,
-    String query, {
-    int count = 50,
-  }) async {
-    final term = query.trim();
-    if (term.isEmpty) return const [];
-    try {
-      final packet = await api.sendRequest(Opcode.chatSearch, {
-        'count': count,
-        'query': term,
-      });
-      if (packet.isError) return const [];
-      return parseMessageResult(packet.payload);
-    } catch (e) {
-      logger.w('searchMessages failed: $e');
-      return const [];
-    }
-  }
-
-  Future<List<ChatSearchHit>> searchPublic(
-    Api api,
-    String query, {
-    int count = 20,
-  }) async {
-    final term = query.trim();
-    if (term.isEmpty) return const [];
-    try {
-      final packet = await api.sendRequest(Opcode.publicSearch, {
-        'type': 'ALL',
-        'count': count,
-        'query': term,
-      });
-      if (packet.isError) return const [];
-      return parseSearchResult(packet.payload);
-    } catch (e) {
-      logger.w('searchPublic failed: $e');
-      return const [];
-    }
-  }
-
   Future<void> subscribeChat(
     Api api,
     int chatId, {
@@ -1340,342 +918,6 @@ class ChatsModule {
     }
   }
 
-  Future<bool> ensureChatCached(Api api, int accountId, int chatId) async {
-    final rows = await AppDatabase.loadChat(accountId, chatId);
-    if (rows.isNotEmpty) return true;
-    try {
-      final info = await getChatInfo(api, chatId);
-      if (info == null) return false;
-      await cacheServerChat(info, accountId, inList: false);
-      return true;
-    } catch (e) {
-      logger.w('ensureChatCached failed for $chatId: $e');
-      return false;
-    }
-  }
-
-  Future<CachedChat?> createGroupChat(
-    Api api, {
-    required String title,
-    required List<int> userIds,
-    bool notify = true,
-  }) async {
-    final payload = {
-      'message': {
-        'cid': DateTime.now().millisecondsSinceEpoch,
-        'attaches': [
-          {
-            '_type': 'CONTROL',
-            'event': 'new',
-            'chatType': 'CHAT',
-            'title': title,
-            'userIds': userIds,
-          },
-        ],
-      },
-      'notify': notify,
-    };
-    final packet = await api.sendRequest(Opcode.msgSend, payload);
-    if (!packet.isOk) {
-      logger.w('createGroupChat: server error payload=${packet.payload}');
-      return null;
-    }
-    final data = packet.payload;
-    if (data is! Map) {
-      logger.w('createGroupChat: payload is not a Map: $data');
-      return null;
-    }
-    final chat = data['chat'];
-    if (chat is! Map) {
-      logger.w('createGroupChat: response has no chat field: $data');
-      return null;
-    }
-    final accountId = await TokenStorage.getActiveAccountId();
-    if (accountId == null) {
-      logger.w('createGroupChat: no active account id');
-      return null;
-    }
-    return cacheServerChat(chat, accountId);
-  }
-
-  Future<String?> requestChatPhotoUploadUrl(Api api) async {
-    final packet = await api.sendRequest(Opcode.photoUpload, {'count': 1});
-    if (!packet.isOk) return null;
-    final data = packet.payload;
-    if (data is! Map) return null;
-    return data['url'] as String?;
-  }
-
-  Future<bool> setChatPhoto(
-    Api api, {
-    required int chatId,
-    required String photoToken,
-  }) async {
-    return api.sendRequestOk(Opcode.chatUpdate, {
-      'chatId': chatId,
-      'photoToken': photoToken,
-    });
-  }
-
-  Future<bool> setChatOptions(
-    Api api, {
-    required int chatId,
-    required Map<String, dynamic> options,
-  }) async {
-    return api.sendRequestOk(Opcode.chatUpdate, {
-      'chatId': chatId,
-      'options': options,
-    });
-  }
-
-  Future<bool> setChatTitle(
-    Api api, {
-    required int chatId,
-    required String title,
-  }) async {
-    final packet = await api.sendRequest(Opcode.chatUpdate, {
-      'chatId': chatId,
-      'theme': title,
-    });
-    if (!packet.isOk) return false;
-    final accountId = await TokenStorage.getActiveAccountId();
-    if (accountId == null) return true;
-    await _updateChat(accountId, chatId, (chat) => chat.copyWith(title: title));
-    return true;
-  }
-
-  Future<String?> setPinnedMessage(
-    Api api, {
-    required int chatId,
-    required int? messageId,
-    bool notify = true,
-  }) async {
-    try {
-      final packet = await api.sendRequest(Opcode.chatUpdate, {
-        'chatId': chatId,
-        'notifyPin': notify,
-        'pinMessageId': messageId ?? 0,
-      });
-      if (!packet.isOk) {
-        return messageFromErrorPayload(packet.payload);
-      }
-      final data = packet.payload;
-      final chat = data is Map ? data['chat'] : null;
-      if (chat is Map) {
-        final accountId = await TokenStorage.getActiveAccountId();
-        if (accountId != null) {
-          await cacheServerChat(chat.cast<dynamic, dynamic>(), accountId);
-        }
-      }
-      return null;
-    } on PacketError catch (e) {
-      logger.w('setPinnedMessage $chatId: ${e.message}');
-      return e.message;
-    } catch (e) {
-      logger.w('setPinnedMessage $chatId: $e');
-      return 'Не удалось изменить закрепление';
-    }
-  }
-
-  Future<String?> togglePin(
-    Api api, {
-    required List<int> chatIds,
-    required bool pin,
-  }) async {
-    if (chatIds.isEmpty) return null;
-    try {
-      final accountId = await TokenStorage.getActiveAccountId();
-      if (accountId == null) return 'Нет активного аккаунта';
-      final folders = await FoldersModule.loadFolders(accountId);
-      final allFolder = folders.firstWhere(
-        FoldersModule.isAllChatsFolder,
-        orElse: () => folders.isEmpty
-            ? throw StateError('Папка "Все" не найдена')
-            : folders.first,
-      );
-
-      final favorites = List<int>.from(allFolder.favorites ?? const []);
-      if (pin) {
-        for (final id in chatIds) {
-          if (!favorites.contains(id)) favorites.add(id);
-        }
-      } else {
-        favorites.removeWhere((id) => chatIds.contains(id));
-      }
-
-      await FoldersModule.setFolderFavorites(
-        api,
-        accountId,
-        allFolder,
-        favorites,
-      );
-
-      final existingRows = await AppDatabase.loadChatsByIds(accountId, chatIds);
-      final updates = <Map<String, dynamic>>[];
-      for (final row in existingRows) {
-        final id = row['id'] as int;
-        final isFav = favorites.contains(id);
-        final currentFav = row['fav_index'] as int?;
-        final newFav = isFav
-            ? ((currentFav ?? 0) > 0 ? currentFav : favorites.indexOf(id) + 1)
-            : 0;
-        if (currentFav == newFav) continue;
-        final newRow = Map<String, dynamic>.from(row);
-        newRow['fav_index'] = newFav;
-        updates.add(newRow);
-      }
-      if (updates.isNotEmpty) {
-        await AppDatabase.saveChats(updates);
-        _bump();
-      }
-      return null;
-    } on PacketError catch (e) {
-      logger.w('togglePin: ${e.message}');
-      return e.message;
-    } catch (e) {
-      logger.w('togglePin: $e');
-      return 'Не удалось изменить закрепление';
-    }
-  }
-
-  Future<String?> setChatMute(
-    Api api, {
-    required int chatId,
-    required int dontDisturbUntil,
-  }) async {
-    try {
-      await api.sendRequest(Opcode.config, {
-        'settings': {
-          'chats': {
-            chatId: {'dontDisturbUntil': dontDisturbUntil},
-          },
-        },
-      });
-      final accountId = await TokenStorage.getActiveAccountId();
-      if (accountId != null) {
-        await _updateChat(
-          accountId,
-          chatId,
-          (chat) => chat.copyWith(dontDisturbUntil: dontDisturbUntil),
-        );
-      }
-      return null;
-    } on PacketError catch (e) {
-      logger.w('setChatMute $chatId: ${e.message}');
-      return e.message;
-    } catch (e) {
-      logger.w('setChatMute $chatId: $e');
-      return 'Не удалось изменить уведомления';
-    }
-  }
-
-  Future<String?> deleteChat(
-    Api api, {
-    required int chatId,
-    required int lastEventTime,
-    required bool forAll,
-  }) async {
-    try {
-      await api.sendRequest(Opcode.chatDelete, {
-        'chatId': chatId,
-        'lastEventTime': lastEventTime,
-        'forAll': forAll,
-      });
-      final accountId = await TokenStorage.getActiveAccountId();
-      if (accountId != null) {
-        await AppDatabase.deleteChat(chatId, accountId);
-        _bump();
-      }
-      return null;
-    } on PacketError catch (e) {
-      logger.w('deleteChat $chatId: ${e.message}');
-      return e.message;
-    } catch (e) {
-      logger.w('deleteChat $chatId: $e');
-      return 'Не удалось удалить чат';
-    }
-  }
-
-  Future<String?> clearHistory(
-    Api api, {
-    required int chatId,
-    required int lastEventTime,
-    bool forAll = false,
-  }) async {
-    try {
-      await api.sendRequest(Opcode.chatClear, {
-        'chatId': chatId,
-        'lastEventTime': lastEventTime,
-        'forAll': forAll,
-      });
-      final accountId = await TokenStorage.getActiveAccountId();
-      if (accountId != null) {
-        await AppDatabase.clearMessages(accountId, chatId);
-        MessageSessionCache.remove(accountId, chatId);
-        _historyFetched.remove(chatId);
-        await reconcileLastMessage(accountId, chatId);
-      }
-      return null;
-    } on PacketError catch (e) {
-      logger.w('clearHistory $chatId: ${e.message}');
-      return e.message;
-    } catch (e) {
-      logger.w('clearHistory $chatId: $e');
-      return 'Не удалось очистить историю';
-    }
-  }
-
-  Future<bool> leaveChat(Api api, {required int chatId}) async {
-    try {
-      await api.sendRequest(Opcode.chatLeave, {'chatId': chatId});
-      final accountId = await TokenStorage.getActiveAccountId();
-      if (accountId != null) {
-        await AppDatabase.deleteChat(chatId, accountId);
-        _bump();
-      }
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<List<CachedChat>> refreshChats(Api api, List<int> chatIds) async {
-    if (chatIds.isEmpty) return const [];
-    try {
-      final packet = await api.sendRequest(Opcode.chatInfo, {
-        'chatIds': chatIds,
-      });
-      final payload = packet.payload;
-      if (payload is! Map) return const [];
-      final list = payload['chats'];
-      if (list is! List) return const [];
-      final accountId = await TokenStorage.getActiveAccountId();
-      if (accountId == null) return const [];
-      final existingRows = await AppDatabase.loadChatsByIds(accountId, chatIds);
-      final preloadedExisting = {
-        for (final row in existingRows)
-          row['id'] as int: CachedChat.fromDbRow(row),
-      };
-      final out = <CachedChat>[];
-      for (final c in list) {
-        if (c is Map) {
-          final cached = await cacheServerChat(
-            c,
-            accountId,
-            preloadedExisting: preloadedExisting,
-          );
-          if (cached != null) out.add(cached);
-        }
-      }
-      return out;
-    } on PacketError catch (e) {
-      logger.w('refreshChats: ${e.message}');
-      return const [];
-    } catch (e) {
-      logger.w('refreshChats: $e');
-      return const [];
-    }
-  }
 }
 
 final chats = ChatsModule._();

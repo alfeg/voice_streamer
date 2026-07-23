@@ -38,8 +38,42 @@ lib/core/nfc
 lib/core/games
 lib/core/push
 
+# 2026-07-23 reader minimality strip (dead Android layer)
+android/app/src/main/kotlin/ru/komet/app/CallNotifier.kt
+android/app/src/main/kotlin/ru/komet/app/CallForegroundService.kt
+android/app/src/main/kotlin/ru/komet/app/NotifAvatars.kt
+android/app/src/main/kotlin/ru/komet/app/NfcExchange.kt
+android/app/src/main/kotlin/ru/komet/app/NfcHostApduService.kt
+android/app/src/main/kotlin/ru/komet/app/BleContactExchange.kt
+android/app/src/main/kotlin/ru/komet/app/VideoNoteRecorder.kt
+android/app/src/main/kotlin/ru/komet/app/UploadForegroundService.kt
+android/app/src/main/res/xml/komet_nfc_apdu.xml
+android/app/src/main/res/values/strings.xml
+android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_minimal.xml
+android/app/src/main/res/mipmap-mdpi/ic_launcher_minimal.png
+android/app/src/main/res/mipmap-hdpi/ic_launcher_minimal.png
+android/app/src/main/res/mipmap-xhdpi/ic_launcher_minimal.png
+android/app/src/main/res/mipmap-xxhdpi/ic_launcher_minimal.png
+android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_minimal.png
+android/app/src/main/res/drawable-mdpi/ic_launcher_minimal_foreground.png
+android/app/src/main/res/drawable-hdpi/ic_launcher_minimal_foreground.png
+android/app/src/main/res/drawable-xhdpi/ic_launcher_minimal_foreground.png
+android/app/src/main/res/drawable-xxhdpi/ic_launcher_minimal_foreground.png
+android/app/src/main/res/drawable-xxxhdpi/ic_launcher_minimal_foreground.png
+tool/make_minimal_adaptive.dart
+tool/make_minimal_android.dart
+
 # Deps to prune from pubspec.yaml after the above (handled separately by strip.sh):
 #   flutter_webrtc, record, opus_dart, opus_flutter_android, video_player,
 #   video_player_media_kit, media_kit_libs_*, firebase_core, firebase_messaging,
 #   flutter_local_notifications, flutter_inappwebview, mobile_scanner, smart_auth,
 #   geolocator, photo_manager, sensors_plus, lottie
+
+# 2026-07-23 reader minimality strip (dead Dart API surface)
+lib/backend/modules/account/two_factor_module.dart
+lib/backend/modules/account/sessions_module.dart
+lib/backend/modules/account/profile_module.dart
+lib/backend/modules/account/privacy_module.dart
+lib/backend/modules/account/account_base.dart
+lib/core/cache/message_session_cache.dart
+lib/models/contact_info.dart

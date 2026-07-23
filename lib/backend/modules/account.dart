@@ -16,10 +16,6 @@ import 'folders.dart';
 import 'messages.dart';
 
 import 'account/account_models.dart';
-import 'account/privacy_module.dart';
-import 'account/profile_module.dart';
-import 'account/sessions_module.dart';
-import 'account/two_factor_module.dart';
 export 'account/account_models.dart';
 
 String _normalizeAuthPhone(String phone) {
@@ -34,10 +30,6 @@ String _maskPhone(String phone) {
 
 class AccountModule {
   final Api _api;
-  late final SessionsModule _sessions = SessionsModule(_api);
-  late final PrivacyModule _privacy = PrivacyModule(_api);
-  late final ProfileModule _profile = ProfileModule(_api);
-  late final TwoFactorModule _twoFactor = TwoFactorModule(_api, _profile);
   final _loginStatusController = StreamController<LoginStatus>.broadcast();
   bool _loggedIn = false;
 
@@ -52,100 +44,6 @@ class AccountModule {
   /// `true`, только когда сервер считает сессию ONLINE — после успешного
   /// login (opcode 19), а не просто после хэндшейка (opcode 6).
   bool get isLoggedIn => _loggedIn;
-
-  Future<PrivacyConfig> getPrivacyConfig() => _privacy.getPrivacyConfig();
-
-  Future<List<BlockedContact>> getBlockedContacts() =>
-      _privacy.getBlockedContacts();
-
-  Future<PrivacyConfig> updatePrivacyConfig(Map<String, dynamic> settings) =>
-      _privacy.updatePrivacyConfig(settings);
-
-  Future<PrivacyConfig> setChatsPushNotification(bool value) =>
-      _privacy.setChatsPushNotification(value);
-
-  Future<PrivacyConfig> setMessagePreview(bool value) =>
-      _privacy.setMessagePreview(value);
-
-  Future<PrivacyConfig> setNotificationSound(bool value) =>
-      _privacy.setNotificationSound(value);
-
-  Future<PrivacyConfig> setCallNotifications(bool value) =>
-      _privacy.setCallNotifications(value);
-
-  Future<PrivacyConfig> setNewContacts(bool value) =>
-      _privacy.setNewContacts(value);
-
-  Future<void> registerPushToken(String pushToken) =>
-      _privacy.registerPushToken(pushToken);
-
-  Future<void> unregisterPushToken(String pushToken) =>
-      _privacy.unregisterPushToken(pushToken);
-
-  Future<ProfileData> updateProfileName(String firstName, String? lastName) =>
-      _profile.updateProfileName(firstName, lastName);
-
-  Future<ProfileData> updateProfileAvatar(
-    String photoToken, {
-    String avatarType = 'USER_AVATAR',
-  }) => _profile.updateProfileAvatar(photoToken, avatarType: avatarType);
-
-  Future<String> getAvatarUploadUrl() => _profile.getAvatarUploadUrl();
-
-  Future<ProfileData> removeProfilePhoto(int photoId) =>
-      _profile.removeProfilePhoto(photoId);
-
-  Future<String> create2faTrack() => _twoFactor.create2faTrack();
-
-  Future<void> set2faPassword(String trackId, String password) =>
-      _twoFactor.set2faPassword(trackId, password);
-
-  Future<void> set2faHint(String trackId, String hint) =>
-      _twoFactor.set2faHint(trackId, hint);
-
-  Future<int> verify2faEmail(String trackId, String email) =>
-      _twoFactor.verify2faEmail(trackId, email);
-
-  Future<String> verify2faCode(String trackId, String code) =>
-      _twoFactor.verify2faCode(trackId, code);
-
-  Future<ProfileData> confirm2fa({
-    required String trackId,
-    required String password,
-    String? hint,
-    bool withEmail = true,
-  }) => _twoFactor.confirm2fa(
-    trackId: trackId,
-    password: password,
-    hint: hint,
-    withEmail: withEmail,
-  );
-
-  Future<String> enter2faPanel() => _twoFactor.enter2faPanel();
-
-  Future<TwoFactorDetails> get2faDetails(String trackId) =>
-      _twoFactor.get2faDetails(trackId);
-
-  Future<TwoFactorDetails> get2faStatus() => _twoFactor.get2faStatus();
-
-  Future<void> check2faPassword(String trackId, String password) =>
-      _twoFactor.check2faPassword(trackId, password);
-
-  Future<ProfileData> update2faPassword({
-    required String trackId,
-    required String newPassword,
-    String? hint,
-  }) => _twoFactor.update2faPassword(
-    trackId: trackId,
-    newPassword: newPassword,
-    hint: hint,
-  );
-
-  Future<ProfileData> commit2faEmailChange(String trackId) =>
-      _twoFactor.commit2faEmailChange(trackId);
-
-  Future<ProfileData> remove2fa(String trackId) =>
-      _twoFactor.remove2fa(trackId);
 
   Future<RequestCodeResult> requestCode(
     String phone, {
@@ -303,13 +201,6 @@ class AccountModule {
     }
   }
 
-  Future<List<SessionInfo>> getSessions() => _sessions.getSessions();
-
-  Future<void> terminateOtherSessions() => _sessions.terminateOtherSessions();
-
-  Future<void> authorizeWebQrLogin(String qrLink) =>
-      _sessions.authorizeWebQrLogin(qrLink);
-
   Future<void> beginAddAccount() async {
     final existing = await AppDatabase.loadAllProfiles();
     await SpoofingService.prepareNewAccountSpoof(
@@ -323,7 +214,6 @@ class AccountModule {
     await TokenStorage.clearActiveAccount();
 
     ContactCache.clear();
-    TranscriptionCache.clear();
     chats.resetForAccountSwitch();
 
     logger.i('Добавление аккаунта: сессия сброшена, активный аккаунт очищен');
@@ -336,7 +226,6 @@ class AccountModule {
     } catch (_) {}
 
     ContactCache.clear();
-    TranscriptionCache.clear();
     chats.resetForAccountSwitch();
 
     await _api.connect();
@@ -366,7 +255,6 @@ class AccountModule {
     await TokenStorage.setActiveAccount(accountId);
 
     ContactCache.clear();
-    TranscriptionCache.clear();
     chats.resetForAccountSwitch();
     await ContactsModule.primeCacheFromDb(accountId);
 
@@ -415,7 +303,6 @@ class AccountModule {
       await removeAccount(accountId);
     }
     ContactCache.clear();
-    TranscriptionCache.clear();
     chats.resetForAccountSwitch();
   }
 
@@ -582,12 +469,6 @@ class AccountModule {
     await chats.syncFromLoginPayload(data, profile.id, profile.id);
     unawaited(chats.paginateChats(_api, profile.id, profile.id, data));
 
-    try {
-      await ContactsModule.syncFromServer(_api, profile.id);
-    } catch (e) {
-      logger.w('Контакты: $e');
-    }
-
     final config = data['config'];
     if (config is Map) {
       await FoldersModule.applyFromLoginConfig(
@@ -598,11 +479,6 @@ class AccountModule {
       if (userConfig is Map) {
         await AppDatabase.savePrivacyConfig(profile.id, jsonEncode(userConfig));
       }
-    }
-    try {
-      await FoldersModule.syncFromServer(_api, profile.id);
-    } catch (e) {
-      logger.w('Папки чатов: $e');
     }
 
     try {

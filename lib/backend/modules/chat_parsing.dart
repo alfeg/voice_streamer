@@ -239,56 +239,6 @@ String? _nameFromContact(Map<dynamic, dynamic> contact) {
   return name['name'] as String?;
 }
 
-List<ChatSearchHit> parseSearchResult(dynamic payload) {
-  final result = (payload as Map?)?['result'];
-  if (result is! List) return const [];
-  final hits = <ChatSearchHit>[];
-  for (final item in result) {
-    if (item is! Map) continue;
-    final chat = item['chat'];
-    if (chat is! Map) continue;
-    final id = chat['id'];
-    if (id is! int) continue;
-    final last = chat['lastMessage'];
-    final link = chat['link'];
-    hits.add(
-      ChatSearchHit(
-        id: id,
-        type: (chat['type'] as String?) ?? 'CHAT',
-        title: chat['title'] as String?,
-        avatarUrl: chat['baseIconUrl'] as String?,
-        subtitle: link is String && link.isNotEmpty
-            ? '@$link'
-            : (last is Map ? last['text'] as String? : null),
-      ),
-    );
-  }
-  return hits;
-}
-
-List<MessageSearchHit> parseMessageResult(dynamic payload) {
-  final result = (payload as Map?)?['result'];
-  if (result is! List) return const [];
-  final hits = <MessageSearchHit>[];
-  for (final item in result) {
-    if (item is! Map) continue;
-    final message = item['message'];
-    if (message is! Map) continue;
-    final chatId = item['chatId'];
-    if (chatId is! int || chatId == 0) continue;
-    hits.add(
-      MessageSearchHit(
-        chatId: chatId,
-        messageId: message['id']?.toString(),
-        text: message['text'] as String?,
-        time: (message['time'] as int?) ?? 0,
-        senderId: (message['sender'] as int?) ?? 0,
-      ),
-    );
-  }
-  return hits;
-}
-
 bool sameChatContent(CachedChat a, CachedChat b) {
   if (a.title != b.title) return false;
   if (a.iconUrl != b.iconUrl) return false;
