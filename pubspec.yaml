@@ -84,18 +84,8 @@ dev_dependencies:
 flutter_launcher_icons:
   image_path: "assets/meteor_icon.png"
   android: "ic_launcher"
-  ios: true
-  remove_alpha_ios: true
-  background_color_ios: "#0A3D62"
   adaptive_icon_background: "#0A3D62"
   adaptive_icon_foreground: "assets/meteor_icon.png"
-  windows:
-    generate: true
-    image_path: "assets/meteor_icon.png"
-    icon_size: 256
-  macos:
-    generate: true
-    image_path: "assets/meteor_icon.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
