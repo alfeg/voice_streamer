@@ -1,6 +1,6 @@
 {
   "@@locale": "ru",
-  "loginTitle": "Войдите в Komet",
+  "loginTitle": "Войдите в ДронВестник",
   "loginSubtitle": "Проверьте код страны и введите свой\nномер телефона.",
   "loginCountry": "Страна",
   "loginPhoneNumber": "Номер телефона",

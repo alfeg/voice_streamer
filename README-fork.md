@@ -1,4 +1,6 @@
-# Max Voice Reader — fork of Komet
+# ДронВестник (DroneHerald) — fork of Komet
+
+> Formerly "Max Voice Reader" / "MaxReader". Package ids keep the old `maxreader` naming.
 
 A stripped, single-purpose Android app built on the [Komet](https://github.com/KometTeam/Komet)
 Max-messenger client. It logs into a Max account, lets you pick channels, and for each chosen

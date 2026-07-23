@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1200" viewBox="0 0 800 1200">
+  <!-- ДронВестник / DroneHerald — promo poster, retro civil-defense style -->
+  <defs>
+    <clipPath id="pframe"><rect width="800" height="1200"/></clipPath>
+  </defs>
+  <g clip-path="url(#pframe)">
+    <!-- cream field -->
+    <rect width="800" height="1200" fill="#F0E6CE"/>
+
+    <!-- top navy band -->
+    <rect width="800" height="150" fill="#0A3D62"/>
+    <g font-family="Arial, Helvetica, sans-serif" text-anchor="middle" fill="#F0E6CE">
+      <text x="400" y="68"  font-size="44" font-weight="900" letter-spacing="6">ВНИМАНИЕ! ВНИМАНИЕ!</text>
+      <rect x="168" y="86" width="464" height="42" fill="#C0392B"/>
+      <text x="400" y="116" font-size="26" font-weight="700" letter-spacing="3" fill="#F0E6CE">ГОВОРИТ ДРОНВЕСТНИК</text>
+    </g>
+
+    <!-- red alert rays from horn toward the sky -->
+    <g fill="#C0392B" opacity="0.12">
+      <path d="M180 900 L640 120 L760 180 Z"/>
+      <path d="M180 900 L760 320 L800 440 Z"/>
+      <path d="M180 900 L800 560 L800 680 Z"/>
+    </g>
+
+    <!-- drone in concentric spotting rings, upper right -->
+    <g transform="translate(545 400)">
+      <circle r="150" fill="none" stroke="#C0392B" stroke-width="6" opacity="0.45"/>
+      <circle r="108" fill="none" stroke="#C0392B" stroke-width="6" opacity="0.7"/>
+      <circle r="66"  fill="none" stroke="#C0392B" stroke-width="6"/>
+      <g fill="#0A3D62">
+        <rect x="-22" y="-11" width="44" height="24" rx="6"/>
+        <rect x="-62" y="-22" width="42" height="8" rx="4" transform="rotate(-24)"/>
+        <rect x="20"  y="-22" width="42" height="8" rx="4" transform="rotate(24)"/>
+        <rect x="-62" y="14"  width="42" height="8" rx="4" transform="rotate(24 -41 18)"/>
+        <rect x="20"  y="14"  width="42" height="8" rx="4" transform="rotate(-24 41 18)"/>
+        <ellipse cx="-56" cy="-36" rx="26" ry="6"/>
+        <ellipse cx="56"  cy="-36" rx="26" ry="6"/>
+        <ellipse cx="-56" cy="36"  rx="26" ry="6"/>
+        <ellipse cx="56"  cy="36"  rx="26" ry="6"/>
+      </g>
+    </g>
+
+    <!-- handheld megaphone, bottom left, aimed up-right at the drone -->
+    <g transform="translate(150 850) rotate(-38) scale(0.72)">
+      <rect x="-160" y="-34" width="70" height="68" rx="6" fill="#0A3D62"/>
+      <path d="M-94 -22 L96 -96 L96 96 L-94 22 Z" fill="#0A3D62"/>
+      <path d="M96 -96 L116 -104 L116 104 L96 96 Z" fill="#C0392B"/>
+      <!-- sound arcs -->
+      <g fill="none" stroke="#C0392B" stroke-width="20" stroke-linecap="round">
+        <path d="M180 -108 A156 156 0 0 1 180 108"/>
+        <path d="M244 -156 A224 224 0 0 1 244 156"/>
+      </g>
+    </g>
+
+    <!-- slogan -->
+    <g font-family="Arial, Helvetica, sans-serif" text-anchor="middle">
+      <text x="518" y="880" font-size="42" font-weight="900" fill="#0A3D62">НЕ СМОТРИ В ЭКРАН —</text>
+      <text x="518" y="938" font-size="42" font-weight="900" fill="#C0392B">СЛУШАЙ!</text>
+    </g>
+
+    <!-- title block -->
+    <g font-family="Arial, Helvetica, sans-serif" text-anchor="middle">
+      <text x="410" y="1058" font-size="82" font-weight="900" letter-spacing="2" fill="#0A3D62">ДРОНВЕСТНИК</text>
+      <rect x="180" y="1082" width="460" height="46" fill="#C0392B"/>
+      <text x="410" y="1115" font-size="24" font-weight="700" letter-spacing="8" fill="#F0E6CE">DRONEHERALD</text>
+      <text x="410" y="1168" font-size="22" font-weight="400" fill="#0A3D62" opacity="0.85">офлайн-озвучка каналов оповещения об угрозах БПЛА</text>
+    </g>
+  </g>
+</svg>

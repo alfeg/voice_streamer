@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- ДронВестник — adaptive icon foreground (transparent bg, content inside ~62% safe zone) -->
+  <!-- horn aimed up-right -->
+  <g transform="translate(452 592) rotate(-38)">
+    <rect x="-158" y="-36" width="72" height="72" rx="9" fill="#F0E6CE"/>
+    <path d="M-92 -25 L94 -98 L94 98 L-92 25 Z" fill="#F0E6CE"/>
+    <path d="M94 -98 L115 -106 L115 106 L94 98 Z" fill="#C0392B"/>
+    <g fill="none" stroke="#C0392B" stroke-width="22" stroke-linecap="round">
+      <path d="M170 -102 A146 146 0 0 1 170 102"/>
+      <path d="M230 -148 A210 210 0 0 1 230 148"/>
+    </g>
+  </g>
+  <!-- drone silhouette top right -->
+  <g transform="translate(676 322)">
+    <g fill="#F0E6CE">
+      <rect x="-24" y="-12" width="48" height="27" rx="7"/>
+      <rect x="-68" y="-24" width="45" height="9" rx="4" transform="rotate(-24)"/>
+      <rect x="23"  y="-24" width="45" height="9" rx="4" transform="rotate(24)"/>
+      <rect x="-68" y="15"  width="45" height="9" rx="4" transform="rotate(24 -45 19)"/>
+      <rect x="23"  y="15"  width="45" height="9" rx="4" transform="rotate(-24 45 19)"/>
+      <ellipse cx="-61" cy="-39" rx="28" ry="7"/>
+      <ellipse cx="61"  cy="-39" rx="28" ry="7"/>
+      <ellipse cx="-61" cy="39"  rx="28" ry="7"/>
+      <ellipse cx="61"  cy="39"  rx="28" ry="7"/>
+    </g>
+  </g>
+</svg>

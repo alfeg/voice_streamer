@@ -1,4 +1,4 @@
-name: Release MaxReader
+name: Release DroneHerald
 
 on:
   push:
@@ -88,7 +88,7 @@ jobs:
           found=0
           for f in app-*-komet-release.apk; do
             abi="${f#app-}"; abi="${abi%-komet-release.apk}"
-            mv "$f" "MaxReader-${{ steps.ver.outputs.name }}-$abi.apk"
+            mv "$f" "DroneHerald-${{ steps.ver.outputs.name }}-$abi.apk"
             found=1
           done
           [ "$found" = 1 ] || { echo "no release APKs found"; ls -lh; exit 1; }
@@ -98,6 +98,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          name: MaxReader ${{ steps.ver.outputs.name }}
+          name: DroneHerald ${{ steps.ver.outputs.name }}
           generate_release_notes: true
-          files: build/app/outputs/flutter-apk/MaxReader-*.apk
+          files: build/app/outputs/flutter-apk/DroneHerald-*.apk

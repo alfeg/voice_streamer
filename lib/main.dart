@@ -835,7 +835,7 @@ class KometAppState extends State<KometApp>
             _rebuildThemesIfNeeded(lightScheme, darkScheme);
 
             return MaterialApp(
-              title: 'MaxReader',
+              title: 'ДронВестник',
               debugShowCheckedModeBanner: false,
               locale: _locale,
               themeMode: _effectiveThemeMode,

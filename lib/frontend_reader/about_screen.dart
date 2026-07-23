@@ -40,7 +40,7 @@ class _AboutScreenState extends State<AboutScreen> {
       final req = await client.getUrl(
         Uri.parse('https://api.github.com/repos/$_repo/releases/latest'),
       );
-      req.headers.set(HttpHeaders.userAgentHeader, 'MaxReader');
+      req.headers.set(HttpHeaders.userAgentHeader, 'DroneHerald');
       final resp = await req.close();
       if (resp.statusCode != 200) {
         if (mounted) setState(() => _updateStatus = 'Не удалось проверить');
@@ -84,7 +84,7 @@ class _AboutScreenState extends State<AboutScreen> {
                 Icon(Icons.record_voice_over, size: 56, color: cs.primary),
                 const SizedBox(height: 8),
                 const Text(
-                  'MaxReader',
+                  'ДронВестник',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                 ),
                 Text(
@@ -116,7 +116,7 @@ class _AboutScreenState extends State<AboutScreen> {
             title: const Text('Лицензии библиотек'),
             onTap: () => showLicensePage(
               context: context,
-              applicationName: 'MaxReader',
+              applicationName: 'ДронВестник',
               applicationVersion: _version,
             ),
           ),
@@ -124,7 +124,7 @@ class _AboutScreenState extends State<AboutScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             child: Text(
-              'MaxReader — урезанный форк клиента Komet для озвучки каналов MAX. '
+              'ДронВестник (DroneHerald) — урезанный форк клиента Komet для озвучки каналов MAX. '
               'Не связан с MAX или VK. Синтез речи — offline (Piper / sherpa-onnx).',
               style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13, height: 1.4),
             ),

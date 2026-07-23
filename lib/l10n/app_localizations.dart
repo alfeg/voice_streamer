@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @loginTitle.
   ///
   /// In en, this message translates to:
-  /// **'Sign in to Komet'**
+  /// **'Sign in to DroneHerald'**
   String get loginTitle;
 
   /// No description provided for @loginSubtitle.

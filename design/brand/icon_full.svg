@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- ДронВестник — legacy launcher icon (background baked in) -->
+  <rect width="1024" height="1024" fill="#0A3D62"/>
+  <!-- subtle rays -->
+  <g fill="#F0E6CE" opacity="0.06">
+    <path d="M400 640 L1024 40 L1024 240 Z"/>
+    <path d="M400 640 L1024 380 L1024 560 Z"/>
+  </g>
+  <!-- horn aimed up-right -->
+  <g transform="translate(420 620) rotate(-38)">
+    <rect x="-198" y="-44" width="88" height="88" rx="10" fill="#F0E6CE"/>
+    <path d="M-116 -30 L118 -122 L118 122 L-116 30 Z" fill="#F0E6CE"/>
+    <path d="M118 -122 L144 -132 L144 132 L118 122 Z" fill="#C0392B"/>
+    <!-- sound arcs -->
+    <g fill="none" stroke="#C0392B" stroke-width="26" stroke-linecap="round">
+      <path d="M212 -128 A182 182 0 0 1 212 128"/>
+      <path d="M288 -184 A262 262 0 0 1 288 184"/>
+    </g>
+  </g>
+  <!-- drone silhouette top right -->
+  <g transform="translate(724 268)">
+    <g fill="#F0E6CE">
+      <rect x="-30" y="-15" width="60" height="33" rx="8"/>
+      <rect x="-84" y="-30" width="56" height="11" rx="5" transform="rotate(-24)"/>
+      <rect x="28"  y="-30" width="56" height="11" rx="5" transform="rotate(24)"/>
+      <rect x="-84" y="19"  width="56" height="11" rx="5" transform="rotate(24 -56 24)"/>
+      <rect x="28"  y="19"  width="56" height="11" rx="5" transform="rotate(-24 56 24)"/>
+      <ellipse cx="-76" cy="-49" rx="35" ry="8"/>
+      <ellipse cx="76"  cy="-49" rx="35" ry="8"/>
+      <ellipse cx="-76" cy="49"  rx="35" ry="8"/>
+      <ellipse cx="76"  cy="49"  rx="35" ry="8"/>
+    </g>
+  </g>
+</svg>

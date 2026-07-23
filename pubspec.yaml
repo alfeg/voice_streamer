@@ -82,10 +82,10 @@ dev_dependencies:
   plugin_platform_interface: ^2.1.0
 
 flutter_launcher_icons:
-  image_path: "assets/meteor_icon.png"
+  image_path: "assets/dronvestnik_icon.png"
   android: "ic_launcher"
   adaptive_icon_background: "#0A3D62"
-  adaptive_icon_foreground: "assets/meteor_icon.png"
+  adaptive_icon_foreground: "assets/dronvestnik_fg.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

@@ -1,6 +1,6 @@
 {
   "@@locale": "en",
-  "loginTitle": "Sign in to Komet",
+  "loginTitle": "Sign in to DroneHerald",
   "loginSubtitle": "Check your country code and enter your\nphone number.",
   "loginCountry": "Country",
   "loginPhoneNumber": "Phone number",

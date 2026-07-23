@@ -763,7 +763,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 const SizedBox(height: 14),
                                 Text(
-                                  'MaxReader — урезанный форк Komet '
+                                  'ДронВестник — урезанный форк Komet '
                                   'для озвучки каналов. Не связан с MAX/VK.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
