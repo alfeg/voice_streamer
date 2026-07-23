@@ -77,3 +77,6 @@ lib/backend/modules/account/privacy_module.dart
 lib/backend/modules/account/account_base.dart
 lib/core/cache/message_session_cache.dart
 lib/models/contact_info.dart
+# 2026-07-23 reader minimality strip (VPN bypass removal)
+lib/core/transport/vpn_bypass.dart
+lib/core/transport/tls_config.dart

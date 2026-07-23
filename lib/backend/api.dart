@@ -14,7 +14,6 @@ import '../core/transport/dispatcher.dart';
 import '../core/transport/receiver.dart';
 import '../core/transport/sender.dart';
 import '../core/transport/traffic_monitor.dart';
-import '../core/transport/vpn_bypass.dart';
 import '../core/utils/debug_session_log.dart';
 import '../core/utils/logger.dart';
 
@@ -77,13 +76,9 @@ class Api {
   int _sessionEpoch = 0;
 
   static const Duration _connectWatchdogTimeout = Duration(seconds: 75);
-  static const Duration _shouldArmTimeout = Duration(seconds: 5);
   static const Duration _endpointTimeout = Duration(seconds: 5);
 
   int get sessionEpoch => _sessionEpoch;
-
-  /// Залипает на время сессии: VPN-путь не сработал — идём мимо туннеля.
-  bool _bypassActive = false;
 
   // Публичное API
 
@@ -108,23 +103,6 @@ class Api {
         }
       });
 
-      bool bypassArmed;
-      try {
-        bypassArmed = await VpnBypassService.instance.shouldArm().timeout(
-          _shouldArmTimeout,
-        );
-      } catch (e) {
-        logger.w('connect: shouldArm завис/упал ($e) — без обхода VPN');
-        bypassArmed = false;
-      }
-      if (gen != _connectGen) return;
-
-      if (!bypassArmed) _bypassActive = false;
-      final useBypass = _bypassActive && bypassArmed;
-      final attemptTimeout = bypassArmed && !useBypass
-          ? const Duration(seconds: 8)
-          : null;
-
       ({String host, int port}) endpoint;
       try {
         endpoint = await ServerConfig.loadEndpoint().timeout(_endpointTimeout);
@@ -137,25 +115,12 @@ class Api {
       }
       if (gen != _connectGen) return;
 
-      logger.i(
-        'connect: endpoint ${endpoint.host}:${endpoint.port}, bypass=$useBypass',
-      );
+      logger.i('connect: endpoint ${endpoint.host}:${endpoint.port}');
       try {
-        await _connection.connect(
-          endpoint.host,
-          endpoint.port,
-          bypassVpn: useBypass,
-          timeout: attemptTimeout,
-        );
+        await _connection.connect(endpoint.host, endpoint.port);
       } catch (e) {
         if (gen != _connectGen) return;
-        await _handleConnectFailure(
-          e,
-          phase: 'Не удалось подключиться',
-          bypassArmed: bypassArmed,
-          useBypass: useBypass,
-          bypassWhy: 'подключение не удалось',
-        );
+        await _handleConnectFailure(e, phase: 'Не удалось подключиться');
         return;
       }
       if (gen != _connectGen) return;
@@ -195,9 +160,6 @@ class Api {
           await _handleConnectFailure(
             StateError('хэндшейк отклонён сервером'),
             phase: 'Хэндшейк отклонён',
-            bypassArmed: bypassArmed,
-            useBypass: useBypass,
-            bypassWhy: 'хэндшейк отклонён',
             disconnectSocket: true,
           );
         }
@@ -206,9 +168,6 @@ class Api {
         await _handleConnectFailure(
           e,
           phase: 'Ошибка хэндшейка',
-          bypassArmed: bypassArmed,
-          useBypass: useBypass,
-          bypassWhy: 'хэндшейк не прошёл',
           disconnectSocket: true,
         );
       }
@@ -254,9 +213,6 @@ class Api {
   Future<void> _handleConnectFailure(
     Object error, {
     required String phase,
-    required bool bypassArmed,
-    required bool useBypass,
-    required String bypassWhy,
     bool disconnectSocket = false,
   }) async {
     logger.e('$phase: $error');
@@ -265,22 +221,13 @@ class Api {
       _cleanup();
       if (disconnectSocket) await _connection.disconnect();
       _setSessionState(SessionState.disconnected);
-      _armBypassIfPossible(bypassArmed, useBypass, bypassWhy);
       _scheduleReconnect();
-    }
-  }
-
-  void _armBypassIfPossible(bool armed, bool alreadyBypassing, String why) {
-    if (armed && !alreadyBypassing && !_bypassActive) {
-      _bypassActive = true;
-      logger.w('VPN bypass: $why — следующая попытка мимо VPN');
     }
   }
 
   /// Отключается без автореконнекта.
   Future<void> disconnect() async {
     _autoReconnect = false;
-    _bypassActive = false;
     _connectGen++;
     _reconnectTimer?.cancel();
     _cleanup();

@@ -50,9 +50,7 @@ import 'backend/modules/messages.dart';
 import 'core/links/deep_link_service.dart';
 import 'core/push/push_service.dart';
 import 'core/storage/app_database.dart';
-import 'core/transport/tls_config.dart';
 import 'core/transport/traffic_monitor.dart';
-import 'core/transport/vpn_bypass.dart';
 import 'core/storage/token_storage.dart';
 import 'core/utils/haptics.dart';
 import 'core/utils/debug_session_log.dart';
@@ -204,8 +202,6 @@ void main(List<String> args) async {
   if (KometSettings.ghostMode.value) SelfPresence.markOffline();
   await ContactCache.load();
   final initialFpsOverlay = prefs.getBool('dev_fps_overlay') ?? false;
-  final initialVpnBypass = prefs.getBool(VpnBypassService.prefKey) ?? false;
-  final initialTlsInsecure = prefs.getBool(TlsConfig.prefKey) ?? false;
   final initialFontId =
       prefs.getString(AppFonts.prefKey) ?? AppFonts.fallback.id;
   final initialFontScale = AppFonts.clampScale(
@@ -244,8 +240,6 @@ void main(List<String> args) async {
     KometApp(
       initialLocale: initialLocale,
       initialFpsOverlay: initialFpsOverlay,
-      initialVpnBypass: initialVpnBypass,
-      initialTlsInsecure: initialTlsInsecure,
       initialFontId: initialFontId,
       initialFontScale: initialFontScale,
       initialAccentSeed: initialAccentSeed,
@@ -258,8 +252,6 @@ class KometApp extends StatefulWidget {
     super.key,
     required this.initialLocale,
     this.initialFpsOverlay = false,
-    this.initialVpnBypass = false,
-    this.initialTlsInsecure = false,
     required this.initialFontId,
     required this.initialFontScale,
     this.initialAccentSeed,
@@ -267,8 +259,6 @@ class KometApp extends StatefulWidget {
 
   final Locale initialLocale;
   final bool initialFpsOverlay;
-  final bool initialVpnBypass;
-  final bool initialTlsInsecure;
   final String initialFontId;
   final double initialFontScale;
   final Color? initialAccentSeed;
@@ -300,21 +290,12 @@ class KometAppState extends State<KometApp>
   final ValueNotifier<Color?> wallpaperSeed = ValueNotifier(null);
   StreamSubscription<SessionExpiredException>? _sessionExpiredSub;
   StreamSubscription<LoginStatus>? _loginStatusSub;
-  StreamSubscription<VpnBypassResult>? _vpnBypassSub;
   StreamSubscription<String>? _serverErrorSub;
   Timer? _scheduleTimer;
-  String? _lastVpnNotice;
-  DateTime _lastVpnNoticeAt = DateTime.fromMillisecondsSinceEpoch(0);
   String? _lastServerError;
   DateTime _lastServerErrorAt = DateTime.fromMillisecondsSinceEpoch(0);
   late final ValueNotifier<bool> fpsOverlayEnabled = ValueNotifier(
     widget.initialFpsOverlay,
-  );
-  late final ValueNotifier<bool> vpnBypassEnabled = ValueNotifier(
-    widget.initialVpnBypass,
-  );
-  late final ValueNotifier<bool> tlsInsecureEnabled = ValueNotifier(
-    widget.initialTlsInsecure,
   );
   late final ValueNotifier<double> fontScale = ValueNotifier(
     widget.initialFontScale,
@@ -393,27 +374,6 @@ class KometAppState extends State<KometApp>
       _isLoggingOut = false;
     });
 
-    _vpnBypassSub = VpnBypassService.instance.events.listen((r) {
-      final msg = r.bound
-          ? 'Соединение через VPN не работает — '
-                'используется ${r.boundInterface ?? r.transport ?? 'прямое подключение'}'
-          : 'Соединение через VPN не работает, обойти не удалось'
-                '${r.reason != null ? ' (${r.reason})' : ''}';
-
-      final now = DateTime.now();
-      if (msg == _lastVpnNotice &&
-          now.difference(_lastVpnNoticeAt).inSeconds < 10) {
-        return;
-      }
-      _lastVpnNotice = msg;
-      _lastVpnNoticeAt = now;
-
-      final overlay = KometApp.navigatorKey.currentState?.overlay;
-      if (overlay != null) {
-        showCustomNotificationOnOverlay(overlay, msg);
-      }
-    });
-
     _serverErrorSub = api.errorStream.listen((msg) {
       final now = DateTime.now();
       if (msg == _lastServerError &&
@@ -435,7 +395,6 @@ class KometAppState extends State<KometApp>
     _finishReveal();
     _sessionExpiredSub?.cancel();
     _loginStatusSub?.cancel();
-    _vpnBypassSub?.cancel();
     _serverErrorSub?.cancel();
     _scheduleTimer?.cancel();
     AppThemeModeConfig.current.removeListener(_onThemeModeChanged);
@@ -446,8 +405,6 @@ class KometAppState extends State<KometApp>
     WidgetsBinding.instance.removeObserver(this);
     _profileUpdateController.close();
     fpsOverlayEnabled.dispose();
-    vpnBypassEnabled.dispose();
-    tlsInsecureEnabled.dispose();
     fontScale.dispose();
     accentSeed.dispose();
     wallpaperSeed.dispose();
@@ -614,19 +571,6 @@ class KometAppState extends State<KometApp>
     fpsOverlayEnabled.value = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('dev_fps_overlay', value);
-  }
-
-  Future<void> setVpnBypassEnabled(bool value) async {
-    if (vpnBypassEnabled.value == value) return;
-    vpnBypassEnabled.value = value;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(VpnBypassService.prefKey, value);
-  }
-
-  Future<void> setTlsInsecureEnabled(bool value) async {
-    if (tlsInsecureEnabled.value == value) return;
-    tlsInsecureEnabled.value = value;
-    await TlsConfig.setInsecureAllowed(value);
   }
 
   Future<void> applyLocale(Locale locale) async {

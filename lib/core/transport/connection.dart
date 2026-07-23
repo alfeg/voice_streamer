@@ -5,9 +5,7 @@ import 'dart:typed_data';
 import '../config/proxy_config.dart';
 import '../utils/logger.dart';
 import 'proxy_connector.dart';
-import 'tls_config.dart';
 import 'traffic_monitor.dart';
-import 'vpn_bypass.dart';
 
 enum SocketState { disconnected, connecting, connected }
 
@@ -16,7 +14,6 @@ enum SocketState { disconnected, connecting, connected }
 class Connection {
   static const Duration _defaultConnectTimeout = Duration(seconds: 15);
   static const Duration _proxyLoadTimeout = Duration(seconds: 8);
-  static const Duration _vpnCallTimeout = Duration(seconds: 5);
 
   SecureSocket? _socket;
   StreamSubscription<Uint8List>? _subscription;
@@ -39,7 +36,6 @@ class Connection {
   Future<void> connect(
     String host,
     int port, {
-    bool bypassVpn = false,
     Duration? timeout,
   }) async {
     if (_state != SocketState.disconnected) {
@@ -59,21 +55,6 @@ class Connection {
       }
 
       logger.i(
-        'Connection: VPN ${bypassVpn ? 'bind (обход)' : 'restoreDefault'}',
-      );
-      try {
-        if (bypassVpn) {
-          await VpnBypassService.instance.bind().timeout(_vpnCallTimeout);
-        } else {
-          await VpnBypassService.instance
-              .restoreDefault()
-              .timeout(_vpnCallTimeout);
-        }
-      } catch (e) {
-        logger.w('Connection: VPN-вызов завис/упал ($e) — продолжаю');
-      }
-
-      logger.i(
         'Connection: открываю сокет $host:$port '
         '(прокси: ${proxySettings.isEnabled ? proxySettings.type.name : 'нет'})',
       );
@@ -90,9 +71,7 @@ class Connection {
 
       final route = proxySettings.isEnabled
           ? 'через прокси ${proxySettings.type.name}'
-          : bypassVpn
-              ? 'напрямую (обход VPN)'
-              : 'прямое соединение';
+          : 'прямое соединение';
       TrafficMonitor.instance.recordEvent(
         'Подключено',
         detail: '$host:$port · TLS · $route',
@@ -136,15 +115,7 @@ class Connection {
       socket = await Socket.connect(host, port, timeout: connectTimeout);
       logger.i('Connection: TCP установлен, начинаю TLS');
     }
-    final allowInsecure = await TlsConfig.isInsecureAllowed();
-    if (allowInsecure) {
-      logger.w(
-        'TLS: проверка сертификата отключена (дебаг) — соединение уязвимо к MitM',
-      );
-    }
-    final secured = allowInsecure
-        ? SecureSocket.secure(socket, host: host, onBadCertificate: (_) => true)
-        : SecureSocket.secure(socket, host: host);
+    final secured = SecureSocket.secure(socket, host: host);
     try {
       final result = await secured.timeout(connectTimeout);
       logger.i('Connection: TLS-handshake завершён');
