@@ -22,7 +22,7 @@ class ReaderService {
   static final ReaderService instance = ReaderService._();
 
   static const int _dedupeLimit = 500;
-  static const int _maxTtsChars = 300;
+  static const int _maxTtsChars = 150;
 
   Api? _api;
   PlaybackQueue? _queue;

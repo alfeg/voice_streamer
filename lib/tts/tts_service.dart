@@ -256,14 +256,18 @@ class TtsService {
     }
   }
 
-  static const int _leadSilenceMs = 300;
+  // Lead-in of quiet noise instead of pure silence: idle car Bluetooth sinks
+  // need an audible signal to wake up, and pure silence gets swallowed along
+  // with the first word.
+  static const int _leadNoiseMs = 450;
+  static const double _leadNoiseAmplitude = 0.005; // ~-46 dBFS, faint hiss
 
   Uint8List _encodeWav(Float32List samples, int sampleRate) {
     const channels = 1;
     const bitsPerSample = 16;
     final byteRate = sampleRate * channels * bitsPerSample ~/ 8;
     final blockAlign = channels * bitsPerSample ~/ 8;
-    final padSamples = (sampleRate * _leadSilenceMs / 1000).round();
+    final padSamples = (sampleRate * _leadNoiseMs / 1000).round();
     final dataSize = (padSamples + samples.length) * 2;
     final totalSize = 44 + dataSize;
 
@@ -284,7 +288,20 @@ class TtsService {
     _writeAscii(bytes, 36, 'data');
     view.setUint32(40, dataSize, Endian.little);
 
-    var offset = 44 + padSamples * 2;
+    // Deterministic white noise via a simple LCG (fixed seed) so every
+    // generated WAV has an identical lead-in.
+    var offset = 44;
+    var lcg = 0x2F6E2B1;
+    for (var i = 0; i < padSamples; i++) {
+      lcg = (lcg * 1103515245 + 12345) & 0x7FFFFFFF;
+      final noise = (lcg / 0x7FFFFFFF) * 2.0 - 1.0; // -1..1
+      view.setInt16(
+        offset,
+        (noise * _leadNoiseAmplitude * 32767.0).round(),
+        Endian.little,
+      );
+      offset += 2;
+    }
     for (final sample in samples) {
       var value = (sample * 32767.0).round();
       if (value > 32767) value = 32767;
