@@ -99,11 +99,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
-    - assets/komet.png
-    - assets/komet_icon.png
-    - assets/meteor_icon.png
-    - assets/emoji_keywords.json
-    - assets/lottie/
+    - assets/dronvestnik_fg.png
     - assets/wallpapers/patterns/
     - assets/tts/vits-piper-ru_RU-irina-medium.zip
 

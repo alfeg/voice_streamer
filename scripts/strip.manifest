@@ -80,3 +80,15 @@ lib/models/contact_info.dart
 # 2026-07-23 reader minimality strip (VPN bypass removal)
 lib/core/transport/vpn_bypass.dart
 lib/core/transport/tls_config.dart
+# 2026-07-23 reader minimality strip (orphaned rlottie build + dead assets)
+android/app/src/main/cpp
+third_party/rlottie_build
+third_party/rlottie.podspec
+.gitmodules
+assets/komet.png
+assets/komet_icon.png
+assets/meteor.png
+assets/meteor_icon.png
+assets/emoji_keywords.json
+assets/lottie
+tool/make_icon_bg.dart

@@ -736,8 +736,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   behavior: HitTestBehavior.opaque,
                                   onTap: _onLogoTap,
                                   child: Image.asset(
-                                    'assets/komet.png',
-                                    height: 80,
+                                    'assets/dronvestnik_fg.png',
+                                    height: 96,
                                     color: cs.onSurface,
                                   ),
                                 ),
