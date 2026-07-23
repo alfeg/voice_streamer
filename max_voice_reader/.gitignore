@@ -151,3 +151,4 @@ test/live_server_probe_test.dart
 
 # TTS model (provisioned via scripts/fetch_tts_model.ps1, bundled as zip asset)
 assets/tts/
+maxreader.keystore

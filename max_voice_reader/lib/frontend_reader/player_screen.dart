@@ -124,6 +124,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
           _buildKeepScreenOn(),
           const SizedBox(height: 24),
           _buildSpeedSlider(),
+          const SizedBox(height: 8),
+          _buildVoicePicker(),
           const SizedBox(height: 16),
           _buildTtsStatus(),
           const SizedBox(height: 16),
@@ -285,6 +287,28 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
+  Widget _buildVoicePicker() {
+    return ValueListenableBuilder<String>(
+      valueListenable: TtsService.instance.currentVoice,
+      builder: (context, id, _) {
+        final name = TtsService.voices
+            .firstWhere((v) => v.id == id, orElse: () => TtsService.voices.first)
+            .name;
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.record_voice_over),
+          title: const Text('Голос'),
+          subtitle: Text(name),
+          trailing: const Icon(Icons.arrow_drop_down),
+          onTap: () => showDialog<void>(
+            context: context,
+            builder: (_) => const _VoiceDialog(),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildTtsStatus() {
     if (TtsService.instance.isReady) {
       return const SizedBox.shrink();
@@ -299,6 +323,127 @@ class _PlayerScreenState extends State<PlayerScreen> {
             'Модель озвучки не установлена — текстовые каналы не читаются',
             style: TextStyle(color: cs.error),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _VoiceDialog extends StatefulWidget {
+  const _VoiceDialog();
+
+  @override
+  State<_VoiceDialog> createState() => _VoiceDialogState();
+}
+
+class _VoiceDialogState extends State<_VoiceDialog> {
+  final Set<String> _installed = {};
+  bool _loading = true;
+  String? _busyId;
+  double? _progress;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInstalled();
+  }
+
+  Future<void> _loadInstalled() async {
+    for (final v in TtsService.voices) {
+      if (await TtsService.instance.isInstalled(v.id)) _installed.add(v.id);
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _select(TtsVoice v) async {
+    if (_busyId != null) return;
+    setState(() {
+      _busyId = v.id;
+      _progress = _installed.contains(v.id) ? null : 0;
+      _error = null;
+    });
+    final ok = await TtsService.instance.setVoice(
+      v.id,
+      onProgress: (p) {
+        if (mounted) setState(() => _progress = p);
+      },
+    );
+    if (!mounted) return;
+    if (ok) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() {
+        _busyId = null;
+        _error = 'Не удалось загрузить голос. Проверьте интернет.';
+      });
+    }
+  }
+
+  Widget _tile(TtsVoice v) {
+    final cs = Theme.of(context).colorScheme;
+    final installed = _installed.contains(v.id);
+    final current = TtsService.instance.currentVoice.value == v.id;
+    final busy = _busyId == v.id;
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        current
+            ? Icons.check_circle
+            : (installed ? Icons.check : Icons.download),
+        color: current ? cs.primary : null,
+      ),
+      title: Text(v.name),
+      subtitle: Text(
+        busy
+            ? (_progress == null
+                  ? 'Установка…'
+                  : 'Загрузка ${(_progress! * 100).round()}%')
+            : (installed ? 'Установлен' : 'Скачать ~64 МБ'),
+      ),
+      trailing: busy
+          ? SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                value: _progress,
+              ),
+            )
+          : null,
+      enabled: _busyId == null,
+      onTap: _busyId == null ? () => _select(v) : null,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return AlertDialog(
+      title: const Text('Выбор голоса'),
+      content: _loading
+          ? const SizedBox(
+              height: 80,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final v in TtsService.voices) _tile(v),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(_error!, style: TextStyle(color: cs.error)),
+                  ),
+              ],
+            ),
+      actions: [
+        TextButton(
+          onPressed: _busyId == null
+              ? () => Navigator.of(context).pop()
+              : null,
+          child: const Text('Закрыть'),
         ),
       ],
     );
