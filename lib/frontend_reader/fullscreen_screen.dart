@@ -7,6 +7,12 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:komet/reader/message_feed.dart';
 
+const int _visible = 6;
+const double _holdSeconds = 40;
+const double _fadeSeconds = 60;
+const double _floorOpacity = 0.4;
+const Duration _motionDuration = Duration(milliseconds: 550);
+
 class FullscreenScreen extends StatefulWidget {
   const FullscreenScreen({super.key});
 
@@ -15,11 +21,6 @@ class FullscreenScreen extends StatefulWidget {
 }
 
 class _FullscreenScreenState extends State<FullscreenScreen> {
-  static const int _visible = 6;
-  static const double _holdSeconds = 40;
-  static const double _fadeSeconds = 60;
-  static const double _floorOpacity = 0.4;
-
   bool _prevWakelock = false;
   Timer? _ticker;
 
@@ -46,16 +47,6 @@ class _FullscreenScreenState extends State<FullscreenScreen> {
     super.dispose();
   }
 
-  double _ageOpacity(DateTime time) {
-    final age = DateTime.now().difference(time).inMilliseconds / 1000.0;
-    if (age <= _holdSeconds) return 1.0;
-    final t = (age - _holdSeconds) / _fadeSeconds;
-    return (1.0 - t).clamp(_floorOpacity, 1.0);
-  }
-
-  String _time(DateTime t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,25 +69,19 @@ class _FullscreenScreenState extends State<FullscreenScreen> {
                         ),
                       );
                     }
-                    final count = items.length < _visible
+                    final count = items.length < _visible + 1
                         ? items.length
-                        : _visible;
+                        : _visible + 1;
                     return SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           for (var i = 0; i < count; i++)
-                            TweenAnimationBuilder<double>(
+                            _FeedRow(
                               key: ValueKey(items[i].id),
-                              tween: Tween<double>(begin: 0.0, end: 1.0),
-                              duration: const Duration(milliseconds: 450),
-                              curve: Curves.easeOut,
-                              builder: (context, t, child) => Transform.translate(
-                                offset: Offset(0, (1 - t) * -24),
-                                child: Opacity(opacity: t, child: child),
-                              ),
-                              child: _row(items[i], i),
+                              item: items[i],
+                              depth: i,
                             ),
                         ],
                       ),
@@ -118,15 +103,89 @@ class _FullscreenScreenState extends State<FullscreenScreen> {
       ),
     );
   }
+}
 
-  Widget _row(FeedItem item, int depth) {
-    final textSize = (36.0 - depth * 7.0).clamp(15.0, 36.0);
-    final titleSize = (18.0 - depth * 2.0).clamp(11.0, 18.0);
+double _ageOpacity(DateTime time) {
+  final age = DateTime.now().difference(time).inMilliseconds / 1000.0;
+  if (age <= _holdSeconds) return 1.0;
+  final t = (age - _holdSeconds) / _fadeSeconds;
+  return (1.0 - t).clamp(_floorOpacity, 1.0);
+}
+
+String _time(DateTime t) =>
+    '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+class _FeedRow extends StatefulWidget {
+  const _FeedRow({super.key, required this.item, required this.depth});
+
+  final FeedItem item;
+  final int depth;
+
+  @override
+  State<_FeedRow> createState() => _FeedRowState();
+}
+
+class _FeedRowState extends State<_FeedRow>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _entrance;
+  late final Animation<double> _grow;
+  late final Animation<double> _fadeIn;
+  late final Animation<Offset> _drop;
+
+  @override
+  void initState() {
+    super.initState();
+    _entrance = AnimationController(vsync: this, duration: _motionDuration);
+    _grow = CurvedAnimation(parent: _entrance, curve: Curves.easeOutCubic);
+    _fadeIn = CurvedAnimation(
+      parent: _entrance,
+      curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
+    );
+    _drop = Tween<Offset>(begin: const Offset(0, -0.4), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _entrance, curve: Curves.easeOutBack));
+    if (widget.depth == 0) {
+      _entrance.forward();
+    } else {
+      _entrance.value = 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _entrance.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizeTransition(
+      sizeFactor: _grow,
+      alignment: Alignment.topCenter,
+      child: FadeTransition(
+        opacity: _fadeIn,
+        child: SlideTransition(
+          position: _drop,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(end: widget.depth.toDouble()),
+            duration: _motionDuration,
+            curve: Curves.easeOutCubic,
+            builder: (context, depth, _) => _content(depth),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _content(double depth) {
+    final item = widget.item;
+    final double textSize = (36.0 - depth * 7.0).clamp(15.0, 36.0);
+    final double titleSize = (18.0 - depth * 2.0).clamp(11.0, 18.0);
+    final double slotFade = (_visible - depth).clamp(0.0, 1.0);
     final url = item.iconUrl;
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 800),
-      opacity: _ageOpacity(item.time),
+      opacity: _ageOpacity(item.time) * slotFade,
       child: Padding(
         padding: const EdgeInsets.only(bottom: 20),
         child: Column(
@@ -175,7 +234,11 @@ class _FullscreenScreenState extends State<FullscreenScreen> {
                 fontSize: textSize,
                 height: 1.15,
                 fontStyle: item.isVoice ? FontStyle.italic : FontStyle.normal,
-                fontWeight: depth == 0 ? FontWeight.w700 : FontWeight.w500,
+                fontWeight: FontWeight.lerp(
+                  FontWeight.w700,
+                  FontWeight.w500,
+                  depth.clamp(0.0, 1.0),
+                ),
               ),
             ),
           ],
