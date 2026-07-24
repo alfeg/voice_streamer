@@ -22,7 +22,15 @@ class ReaderService {
   static final ReaderService instance = ReaderService._();
 
   static const int _dedupeLimit = 500;
-  static const int _maxTtsChars = 150;
+  static const int _maxTtsChars = 200;
+
+  static String _clip(String text) {
+    if (text.length <= _maxTtsChars) return text;
+    final cut = text.substring(0, _maxTtsChars);
+    final lastSpace = cut.lastIndexOf(RegExp(r'\s'));
+    final head = lastSpace > 0 ? cut.substring(0, lastSpace) : cut;
+    return '${head.trimRight()}…';
+  }
 
   Api? _api;
   PlaybackQueue? _queue;
@@ -224,11 +232,9 @@ class ReaderService {
     }
 
     final trimmed = raw.trim();
-    final text = trimmed.length > _maxTtsChars
-        ? '${trimmed.substring(0, _maxTtsChars)}…'
-        : trimmed;
+    final text = _clip(trimmed);
     if (text.length < trimmed.length) {
-      debugPrint('[READER] tts: text clipped ${trimmed.length} -> $_maxTtsChars');
+      debugPrint('[READER] tts: text clipped ${trimmed.length} -> ${text.length}');
     }
 
     MessageFeed.instance.add(
