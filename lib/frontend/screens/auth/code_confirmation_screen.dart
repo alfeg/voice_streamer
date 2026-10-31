@@ -268,6 +268,7 @@ class _CodeConfirmationScreenState extends State<CodeConfirmationScreen>
         return;
       }
 
+      stopSessionRecovery();
       final loginResult = await accountModule.login();
 
       if (!mounted) return;
