@@ -44,9 +44,11 @@ class Api {
 
   int? _callsSeed;
   String? _deviceId;
+  String _architecture = SpoofingService.defaultArchitecture;
 
   int? get callsSeed => _callsSeed;
   String? get deviceId => _deviceId;
+  String get architecture => _architecture;
 
   String? spoofScope;
 
@@ -74,6 +76,10 @@ class Api {
   int _reconnectAttempts = 0;
   bool _autoReconnect = false;
   int _sessionEpoch = 0;
+  bool _willAuthenticate = false;
+  bool _suppressReconnectLogin = false;
+
+  bool get isAuthenticatedHandshake => _willAuthenticate;
 
   static const Duration _connectWatchdogTimeout = Duration(seconds: 75);
   static const Duration _endpointTimeout = Duration(seconds: 5);
@@ -83,7 +89,11 @@ class Api {
   // Публичное API
 
   /// Подключается к серверу, шлёт хэндшейк, запускает пинг.
-  Future<void> connect() async {
+  ///
+  /// [authenticated] выбирает версию хэндшейка: `true` — боевая под вход по
+  /// токену, `false` — pre-login без токена, `null` — прежний режим.
+  Future<void> connect({bool? authenticated}) async {
+    if (authenticated != null) _willAuthenticate = authenticated;
     if (_sessionState != SessionState.disconnected) {
       logger.i('connect пропущен: состояние ${_sessionState.name}');
       return;
@@ -142,7 +152,7 @@ class Api {
           _cancelConnectWatchdog();
           _startPinging();
           logger.i('Сессия онлайн, хэндшейк ок');
-          if (_onReconnectCallback != null) {
+          if (_onReconnectCallback != null && !_suppressReconnectLogin) {
             try {
               await _onReconnectCallback!();
             } catch (e) {
@@ -338,6 +348,11 @@ class Api {
       if (sClientSession is int) clientSessionId = sClientSession;
     }
 
+    if (!_willAuthenticate) {
+      appVersion = SpoofingService.preLoginAppVersion;
+      buildNumber = SpoofingService.preLoginBuildNumber;
+    }
+
     _userAgent = {
       'deviceType': deviceType,
       'appVersion': appVersion,
@@ -353,6 +368,7 @@ class Api {
     };
 
     _deviceId = deviceId;
+    _architecture = architecture;
 
     final payload = <dynamic, dynamic>{
       'mt_instanceid': instanceId,
@@ -523,6 +539,16 @@ class Api {
 
   Future<void> reconnectAndLogin() async {
     await connect();
+  }
+
+  Future<void> reconnectForLogin() async {
+    _suppressReconnectLogin = true;
+    try {
+      await disconnect();
+      await connect(authenticated: true);
+    } finally {
+      _suppressReconnectLogin = false;
+    }
   }
 
   Future<void> Function()? _onReconnectCallback;

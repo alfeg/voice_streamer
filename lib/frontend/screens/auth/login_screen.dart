@@ -47,7 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     _sessionState = api.state;
     if (api.state == SessionState.disconnected) {
-      unawaited(api.connect());
+      unawaited(api.connect(authenticated: false));
     }
     _stateSub = api.stateStream.listen((state) {
       if (mounted) setState(() => _sessionState = state);

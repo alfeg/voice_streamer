@@ -166,6 +166,11 @@ class AccountModule {
       }
     }
 
+    if (!_api.isAuthenticatedHandshake) {
+      await _api.reconnectForLogin();
+      _ensureOnline();
+    }
+
     final requestPayload = buildLoginPayload(authToken, sync: syncParams);
 
     _loginStatusController.add(LoginStatus.loading);
@@ -228,7 +233,7 @@ class AccountModule {
     ContactCache.clear();
     chats.resetForAccountSwitch();
 
-    await _api.connect();
+    await _api.connect(authenticated: true);
     if (_api.state != SessionState.online) {
       throw StateError('loginWithToken: нет соединения с сервером');
     }
@@ -259,7 +264,7 @@ class AccountModule {
     await ContactsModule.primeCacheFromDb(accountId);
 
     try {
-      await _api.connect();
+      await _api.connect(authenticated: true);
     } catch (e) {
       logger.e(
         'switchAccount: ошибка соединения при переключении на $accountId: $e',
@@ -313,7 +318,7 @@ class AccountModule {
 
   Future<void> _ensureLogoutSession(int? accountId) async {
     if (_api.state == SessionState.disconnected) {
-      await _api.connect();
+      await _api.connect(authenticated: true);
     }
     if (_api.state != SessionState.online) {
       await _api.stateStream
@@ -412,6 +417,8 @@ class AccountModule {
       payload['chatCacheFingerprint'] = ChatCacheFingerprint.compute(
         callsSeed,
         deviceId,
+        arch: _api.architecture,
+        preLogin: !_api.isAuthenticatedHandshake,
       );
     }
 
@@ -656,7 +663,12 @@ class AccountModule {
     final callsSeed = _api.callsSeed;
     final deviceId = _api.deviceId;
     if (callsSeed != null && deviceId != null) {
-      payload['mode'] = ChatCacheFingerprint.compute(callsSeed, deviceId);
+      payload['mode'] = ChatCacheFingerprint.compute(
+        callsSeed,
+        deviceId,
+        arch: _api.architecture,
+        preLogin: !_api.isAuthenticatedHandshake,
+      );
     }
 
     logger.i(

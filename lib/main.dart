@@ -855,13 +855,13 @@ class _StartupScreenState extends State<_StartupScreen> {
       return;
     }
 
-    unawaited(api.connect());
-
     int? accountId = await TokenStorage.getActiveAccountId();
 
     if (accountId == null || await TokenStorage.readToken(accountId) == null) {
       accountId = await _recoverActiveAccount();
     }
+
+    unawaited(api.connect(authenticated: accountId != null));
 
     if (!mounted) return;
 

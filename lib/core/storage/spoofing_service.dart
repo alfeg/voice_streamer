@@ -10,9 +10,19 @@ import '../utils/ids.dart';
 import '../utils/logger.dart';
 
 class SpoofingService {
-  static const String hardcodedAppVersion = '26.20.2';
-  static const int hardcodedBuildNumber = 6758;
+  static const String hardcodedAppVersion = '26.31.0';
+  static const int hardcodedBuildNumber = 6822;
+  static const String preLoginAppVersion = '26.23.2';
+  static const int preLoginBuildNumber = 6779;
   static const String pendingScope = 'pending';
+  static const String androidDeviceType = 'ANDROID';
+  static const String defaultArchitecture = 'arm64-v8a';
+  static const List<String> supportedArchitectures = [
+    'arm64-v8a',
+    'armeabi-v7a',
+    'x86',
+    'x86_64',
+  ];
 
   static const String _legacyEnabledKey = 'spoofing_enabled';
   static const List<String> _legacyKeys = [
@@ -82,7 +92,7 @@ class SpoofingService {
       }
     }
 
-    bool isAndroid(DevicePreset p) => p.deviceType == 'ANDROID';
+    bool isAndroid(DevicePreset p) => p.deviceType == androidDeviceType;
     final fresh = devicePresets
         .where((p) => isAndroid(p) && !used.contains(p.deviceName))
         .toList();
@@ -101,8 +111,8 @@ class SpoofingService {
       locale: shortLocale,
       deviceLocale: shortLocale,
       deviceId: _hex(8),
-      deviceType: preset.deviceType,
-      arch: 'arm64-v8a',
+      deviceType: androidDeviceType,
+      arch: defaultArchitecture,
       appVersion: hardcodedAppVersion,
       buildNumber: hardcodedBuildNumber,
       pushDeviceType: 'GCM',
@@ -137,7 +147,7 @@ class SpoofingService {
       'app_version': profile.appVersion.isEmpty
           ? hardcodedAppVersion
           : profile.appVersion,
-      'arch': profile.arch.isEmpty ? 'arm64-v8a' : profile.arch,
+      'arch': profile.arch.isEmpty ? defaultArchitecture : profile.arch,
       'build_number': profile.buildNumber == 0
           ? hardcodedBuildNumber
           : profile.buildNumber,
@@ -191,7 +201,7 @@ class SpoofingService {
         final profile = SpoofProfile.fromJson(
           jsonDecode(raw) as Map<String, dynamic>,
         );
-        return _migrateVersion(prefs, scope, profile);
+        return await _migrateProfile(prefs, scope, profile);
       } catch (e) {
         logger.w('spoof profile read failed: $e');
       }
@@ -202,18 +212,25 @@ class SpoofingService {
     return null;
   }
 
-  static Future<SpoofProfile> _migrateVersion(
+  static Future<SpoofProfile> _migrateProfile(
     SharedPreferences prefs,
     String scope,
     SpoofProfile profile,
   ) async {
+    final arch = supportedArchitectures.contains(profile.arch)
+        ? profile.arch
+        : defaultArchitecture;
     if (profile.appVersion == hardcodedAppVersion &&
-        profile.buildNumber == hardcodedBuildNumber) {
+        profile.buildNumber == hardcodedBuildNumber &&
+        profile.deviceType == androidDeviceType &&
+        profile.arch == arch) {
       return profile;
     }
     final migrated = profile.copyWith(
       appVersion: hardcodedAppVersion,
       buildNumber: hardcodedBuildNumber,
+      deviceType: androidDeviceType,
+      arch: arch,
     );
     await prefs.setString(_profileKey(scope), jsonEncode(migrated.toJson()));
     return migrated;
@@ -234,8 +251,8 @@ class SpoofingService {
       locale: prefs.getString('spoof_locale') ?? '',
       deviceLocale: prefs.getString('spoof_devicelocale') ?? '',
       deviceId: prefs.getString('spoof_deviceid') ?? '',
-      deviceType: prefs.getString('spoof_devicetype') ?? 'ANDROID',
-      arch: prefs.getString('spoof_arch') ?? 'arm64-v8a',
+      deviceType: androidDeviceType,
+      arch: prefs.getString('spoof_arch') ?? defaultArchitecture,
       appVersion: prefs.getString('spoof_appversion') ?? hardcodedAppVersion,
       buildNumber: prefs.getInt('spoof_buildnumber') ?? hardcodedBuildNumber,
       pushDeviceType: prefs.getString('spoof_pushdevicetype') ?? 'GCM',
