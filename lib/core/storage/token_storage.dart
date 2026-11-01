@@ -6,7 +6,7 @@ class TokenStorage {
   static const _activeAccountKey = 'active_account_id';
 
   static const _secure = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(),
     mOptions: MacOsOptions(usesDataProtectionKeychain: false),
   );
 

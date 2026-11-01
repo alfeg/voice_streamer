@@ -32,7 +32,7 @@ android {
 
     defaultConfig {
         applicationId = "ru.maxvoice.reader"
-        minSdk = maxOf(flutter.minSdkVersion, 23)
+        minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
