@@ -4,10 +4,20 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      build_number:
+        description: Android versionCode (defaults to the pubspec build number)
+        required: false
+        default: ''
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -19,6 +29,13 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+
+      - name: Install Rust toolchain for the kolibri native core
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
 
       - run: flutter --version
 
@@ -39,9 +56,26 @@ jobs:
           fi
           ls -lh "assets/tts/$VOICE.zip"
 
+      - name: Set up release signing
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          cat > android/key.properties <<EOF
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=release.keystore
+          EOF
+          echo "Release signing configured"
+
       - run: flutter pub get
 
-      - run: flutter build apk --release --flavor komet --split-per-abi
+      - name: Build release APKs
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number }}
+        run: >
+          flutter build apk --release --flavor komet --split-per-abi
+          ${BUILD_NUMBER:+--build-number=$BUILD_NUMBER}
 
       - uses: actions/upload-artifact@v4
         with:

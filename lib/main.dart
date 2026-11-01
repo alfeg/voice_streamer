@@ -6,6 +6,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:kolibri/kolibri.dart' show initKolibri;
 import 'package:komet/l10n/app_localizations.dart';
 import 'package:m3e_collection/m3e_collection.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -140,6 +141,7 @@ void main(List<String> args) async {
   if (AppInstance.isNamed) {
     SharedPreferences.setPrefix('flutter.${AppInstance.id}.');
   }
+  await initKolibri();
   await AppDatabase.init();
   await ChannelConfig.load();
   await PlaybackQueue.instance.init();

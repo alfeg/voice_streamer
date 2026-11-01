@@ -81,6 +81,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.2"
+  build_cli_annotations:
+    dependency: transitive
+    description:
+      name: build_cli_annotations
+      sha256: e563c2e01de8974566a1998410d3f6f03521788160a02503b0b1f1a46c7b3d95
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.1"
   button_group_m3e:
     dependency: transitive
     description:
@@ -185,14 +193,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.2"
-  dart_lz4:
-    dependency: "direct main"
-    description:
-      name: dart_lz4
-      sha256: cf6ee757b352f616013f6dc3db7951cdd72cb07ae6462d339882fbcd8a4f2291
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.4.0"
   dbus:
     dependency: transitive
     description:
@@ -323,6 +323,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_rust_bridge:
+    dependency: "direct main"
+    description:
+      name: flutter_rust_bridge
+      sha256: e87d6b9ee934dcd24a128ccb2bd91905d2d5fe5c06245d6a8f5477d4907a437a
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.12.0"
   flutter_secure_storage:
     dependency: "direct main"
     description:
@@ -397,6 +405,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  freezed_annotation:
+    dependency: transitive
+    description:
+      name: freezed_annotation
+      sha256: "7294967ff0a6d98638e7acb774aac3af2550777accd8149c90af5b014e6d44d8"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.0"
   glob:
     dependency: transitive
     description:
@@ -509,6 +525,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.4.16"
+  kolibri:
+    dependency: "direct main"
+    description:
+      name: kolibri
+      sha256: e2f3414e6a8601c31dd3c5a7ebd901e48b67bf29265333b27366402bf4ac52ef
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.5"
   leak_tracker:
     dependency: transitive
     description:
@@ -533,14 +557,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.2"
-  libcompress:
-    dependency: "direct main"
-    description:
-      name: libcompress
-      sha256: "20d122f71df3e94007c2d069dc81ea497bbb15dffa7d6e6df61462d6ce6b1efa"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.3.0"
   lints:
     dependency: transitive
     description:
@@ -637,14 +653,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.18.0"
-  msgpack_dart:
-    dependency: "direct main"
-    description:
-      name: msgpack_dart
-      sha256: c2d235ed01f364719b5296aecf43ac330f0d7bc865fa134d0d7910a40454dffb
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.1"
   native_toolchain_c:
     dependency: transitive
     description:
