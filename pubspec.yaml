@@ -64,6 +64,7 @@ dependencies:
   flutter_svg: ^2.0.10
   sherpa_onnx: ^1.10.32
   just_audio: ^0.9.42
+  audio_session: ^0.1.25
   archive: ^4.0.0
   wakelock_plus: ^1.2.0
 

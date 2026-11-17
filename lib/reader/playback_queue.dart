@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -39,7 +40,32 @@ class PlaybackQueue {
   final ValueNotifier<int> queueLength = ValueNotifier<int>(0);
 
   Future<void> init() async {
+    final session = await AudioSession.instance;
+    await session.configure(
+      const AudioSessionConfiguration(
+        avAudioSessionCategory: AVAudioSessionCategory.playback,
+        avAudioSessionCategoryOptions:
+            AVAudioSessionCategoryOptions.duckOthers,
+        avAudioSessionMode: AVAudioSessionMode.spokenAudio,
+        androidAudioAttributes: AndroidAudioAttributes(
+          contentType: AndroidAudioContentType.speech,
+          usage: AndroidAudioUsage.media,
+        ),
+        androidAudioFocusGainType:
+            AndroidAudioFocusGainType.gainTransientMayDuck,
+        androidWillPauseWhenDucked: false,
+      ),
+    );
     _player ??= AudioPlayer();
+  }
+
+  Future<void> _releaseAudioFocus() async {
+    try {
+      final session = await AudioSession.instance;
+      await session.setActive(false);
+    } catch (e) {
+      logger.w('PlaybackQueue: releasing audio focus failed: $e');
+    }
   }
 
   void setSpeed(double v) {
@@ -100,6 +126,7 @@ class PlaybackQueue {
     } catch (e) {
       logger.w('PlaybackQueue: stop failed: $e');
     }
+    await _releaseAudioFocus();
     current.value = null;
   }
 
@@ -147,6 +174,9 @@ class PlaybackQueue {
       }
     } finally {
       _pumping = false;
+      if (_pending.isEmpty) {
+        await _releaseAudioFocus();
+      }
       _scheduleIdleReset();
     }
   }
